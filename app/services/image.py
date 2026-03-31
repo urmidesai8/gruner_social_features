@@ -1,17 +1,17 @@
+from typing import List, Tuple
+
 import asyncio
 import base64
 import io
 import os
-from typing import Tuple, List
 
-from diffusers import DiffusionPipeline
-from diffusers import Kandinsky5T2IPipeline
+from diffusers import DiffusionPipeline, Kandinsky5T2IPipeline
 from huggingface_hub import InferenceClient
-from huggingface_hub.errors import RemoteEntryNotFoundError
-from huggingface_hub.errors import HfHubHTTPError
+from huggingface_hub.errors import HfHubHTTPError, RemoteEntryNotFoundError
 from PIL import Image
 import torch
 from dotenv import load_dotenv
+
 load_dotenv()
 
 MODELS: List[str] = [
@@ -29,7 +29,6 @@ _TITAN_MODEL = "amazon.titan-image-generator-v2:0"
 _NOVA_CANVAS_MODEL = "amazon.nova-canvas-v1:0"
 _OPENAI_MODEL = "gpt-image-1.5"
 _KANDINSKY_PIPELINE_MODEL_CANDIDATES: List[str] = [
-    # These are the Diffusers pipeline repos that include `model_index.json`.
     "kandinskylab/Kandinsky-5.0-T2I-Lite-sft-Diffusers",
     "kandinskylab/Kandinsky-5.0-T2I-Lite-pretrain-Diffusers",
 ]
@@ -62,24 +61,19 @@ def _get_inference_client(provider: str) -> InferenceClient:
 
 
 def _provider_candidates(model: str) -> List[str]:
-    # First try hf-inference (HF token only route). If unavailable, fall back.
     return ["default", "hf-inference", "fal-ai"]
 
 
 def _get_stability_inference_client_hf_inference() -> InferenceClient:
-    """
-    Keep this model on the hf-inference provider only (no fallback),
-    since the provided code path is working for the user.
-    """
     global _stability_inference_client_hf_inference
     if _stability_inference_client_hf_inference is None:
         token = _require_hf_token()
-        # Per user request: keep provider + api_key wiring.
         _stability_inference_client_hf_inference = InferenceClient(
             provider="hf-inference",
             api_key=token,
         )
     return _stability_inference_client_hf_inference
+
 
 async def _get_kandinsky_pipeline() -> DiffusionPipeline:
     global _kandinsky_pipe
@@ -88,8 +82,6 @@ async def _get_kandinsky_pipeline() -> DiffusionPipeline:
             return _kandinsky_pipe
 
         token = _require_hf_token()
-
-        # Prefer bfloat16 on CUDA; fall back to float32 elsewhere.
         torch_dtype = torch.bfloat16 if torch.cuda.is_available() else torch.float32
         device_map = "cuda" if torch.cuda.is_available() else None
 
@@ -100,14 +92,9 @@ async def _get_kandinsky_pipeline() -> DiffusionPipeline:
         if device_map is not None:
             kwargs["device_map"] = device_map
 
-        # Your provided reference uses DiffusionPipeline directly.
-        # If the base repo doesn't contain `model_index.json`, fall back to the
-        # dedicated Kandinsky pipeline repos.
-        pipe: DiffusionPipeline
         try:
-            pipe = DiffusionPipeline.from_pretrained(_KANDINSKY_MODEL, **kwargs)
+            pipe: DiffusionPipeline = DiffusionPipeline.from_pretrained(_KANDINSKY_MODEL, **kwargs)
         except RemoteEntryNotFoundError:
-            # Missing pipeline metadata (e.g. `model_index.json`) at the base repo.
             last_error: Exception | None = None
             for candidate in _KANDINSKY_PIPELINE_MODEL_CANDIDATES:
                 try:
@@ -155,7 +142,6 @@ def _generate_via_inference_client(model: str, prompt: str) -> Image.Image:
 
 
 def _generate_kandinsky_sync(pipe: DiffusionPipeline, prompt: str) -> Image.Image:
-    # Per your reference code: image = pipe(prompt).images[0]
     return pipe(prompt).images[0]
 
 
@@ -163,18 +149,18 @@ def _generate_aws_bedrock_image_sync(model_id: str, prompt: str) -> Tuple[str, s
     import boto3
     import botocore.exceptions
     import json
-    
-    # Bedrock image models may have a strict 512 character limit for prompts
+
     max_len = 512
     if model_id == _TITAN_MODEL and len(prompt) > max_len:
-        raise ValueError(f"{model_id} only supports prompts up to {max_len} characters. Your prompt was {len(prompt)} characters.")
-    
+        raise ValueError(
+            f"{model_id} only supports prompts up to {max_len} characters. Your prompt was {len(prompt)} characters."
+        )
+
     aws_access_key_id = os.getenv("AWS_ACCESS_KEY")
     aws_secret_access_key = os.getenv("AWS_SECRET_KEY")
     if not (aws_access_key_id and aws_secret_access_key):
         raise RuntimeError("Missing AWS credentials in environment for Amazon Bedrock models.")
 
-    # Different Bedrock regions for the models
     region_name = "us-east-1" if model_id == _NOVA_CANVAS_MODEL else "us-west-2"
 
     bedrock = boto3.client(
@@ -186,16 +172,14 @@ def _generate_aws_bedrock_image_sync(model_id: str, prompt: str) -> Tuple[str, s
 
     body = {
         "taskType": "TEXT_IMAGE",
-        "textToImageParams": {
-            "text": prompt
-        },
+        "textToImageParams": {"text": prompt},
         "imageGenerationConfig": {
             "numberOfImages": 1,
             "height": 1024,
             "width": 1024,
             "cfgScale": 8.0,
-            "seed": 0
-        }
+            "seed": 0,
+        },
     }
 
     try:
@@ -203,35 +187,31 @@ def _generate_aws_bedrock_image_sync(model_id: str, prompt: str) -> Tuple[str, s
             modelId=model_id,
             body=json.dumps(body),
             accept="application/json",
-            contentType="application/json"
+            contentType="application/json",
         )
     except botocore.exceptions.ClientError as e:
-        error_code = e.response.get("Error", {}).get("Code", "Unknown")
         error_message = e.response.get("Error", {}).get("Message", str(e))
-        # if error_code == "ValidationException" and "blocked" in error_message.lower():
-        #     raise RuntimeError("The generated image was blocked by AWS Responsible AI Policy. Please try a different prompt.") from e
         raise RuntimeError(f"AWS Bedrock error: {error_message}") from e
 
     response_body = json.loads(response.get("body").read())
-    
-    # Defensive check if 'images' is missing
     if "images" not in response_body or response_body["images"] is None:
-        raise RuntimeError(f"Bedrock ({model_id}) response did not contain 'images'. Raw response: {json.dumps(response_body)}")
-        
+        raise RuntimeError(
+            f"Bedrock ({model_id}) response did not contain 'images'. Raw response: {json.dumps(response_body)}"
+        )
+
     base64_image = response_body.get("images")[0]
     return "image/png", base64_image
 
 
 def _generate_openai_image_sync(model_id: str, prompt: str) -> Tuple[str, str]:
     from openai import OpenAI
-    import os
 
     api_key = os.getenv("OPENAI_KEY")
     if not api_key:
         raise RuntimeError("Missing OPENAI_KEY in environment.")
 
     client = OpenAI(api_key=api_key)
-    
+
     try:
         response = client.images.generate(
             model=model_id,
@@ -239,13 +219,11 @@ def _generate_openai_image_sync(model_id: str, prompt: str) -> Tuple[str, str]:
             n=1,
             size="1024x1024",
         )
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         raise RuntimeError(f"OpenAI error: {e}") from e
-    
-    # Try getting b64_json first if implemented, otherwise fallback to url
+
     import httpx
-    import base64
-    
+
     data = response.data[0]
     if data.b64_json:
         base64_image = data.b64_json
@@ -255,7 +233,7 @@ def _generate_openai_image_sync(model_id: str, prompt: str) -> Tuple[str, str]:
         base64_image = base64.b64encode(img_response.content).decode("ascii")
     else:
         raise RuntimeError(f"OpenAI response missing image data: {response}")
-        
+
     return "image/png", base64_image
 
 
@@ -270,7 +248,6 @@ async def generate_image_base64(model: str, prompt: str) -> Tuple[str, str]:
             return _encode_pil_image_to_base64(image)
 
     if model == _STABILITY_MODEL:
-        # No provider fallback for stability; keep hf-inference-only behavior.
         client = _get_stability_inference_client_hf_inference()
         try:
             image = await asyncio.to_thread(client.text_to_image, prompt, model=model)
@@ -284,7 +261,12 @@ async def generate_image_base64(model: str, prompt: str) -> Tuple[str, str]:
     if model == _OPENAI_MODEL:
         return await asyncio.to_thread(_generate_openai_image_sync, model, prompt)
 
-    # Other models via Hugging Face InferenceClient (as in your reference).
     image = await asyncio.to_thread(_generate_via_inference_client, model, prompt)
     return _encode_pil_image_to_base64(image)
+
+
+__all__ = [
+    "MODELS",
+    "generate_image_base64",
+]
 

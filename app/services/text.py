@@ -1,3 +1,5 @@
+from typing import List, Tuple
+
 import asyncio
 import base64
 import io
@@ -7,14 +9,12 @@ import os
 import textwrap
 import time
 from pathlib import Path
-from typing import List, Tuple
 
 from PIL import Image, ImageDraw, ImageFont
 
-from app.ai import generate_image_base64
+from app.services.image import generate_image_base64
 
 _QUOTE_CARD_MODEL = "stabilityai/stable-diffusion-xl-base-1.0"
-# Background-only prompt when using PIL overlay (no text in the diffusion output).
 _QUOTE_BG_ONLY_PROMPT = (
     "Soft full-bleed pastel gradient background only, smooth color blend, instagram aesthetic, "
     "subtle light vignette, dreamy abstract atmosphere. "
@@ -23,7 +23,6 @@ _QUOTE_BG_ONLY_PROMPT = (
     "No circles or diagrams. No objects in the center. Uniform simple gradient fill."
 )
 
-# Use Uvicorn logger so INFO logs are visible in the running server terminal.
 logger = logging.getLogger("uvicorn.error")
 
 _APP_DIR = Path(__file__).resolve().parent
@@ -34,8 +33,8 @@ def _quote_font_candidates() -> List[str]:
     paths = [
         env,
         "Poppins-Bold.ttf",
-        str(_APP_DIR / "static" / "fonts" / "Poppins-Bold.ttf"),
-        str(_APP_DIR / "Poppins-Bold.ttf"),
+        str(_APP_DIR.parent / "static" / "fonts" / "Poppins-Bold.ttf"),
+        str(_APP_DIR.parent / "Poppins-Bold.ttf"),
         "DejaVuSans-Bold.ttf",
         "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
         "/System/Library/Fonts/Supplemental/Arial Bold.ttf",
@@ -89,7 +88,6 @@ def _overlay_quote_on_image_sync(image_b64: str, quote: str) -> Tuple[str, str]:
     wrapped_text = _wrap_text(quote, width=wrap_cols)
     bbox, text_width, text_height = _measure_block()
 
-    # Shrink wrap width / font so the block (including stroke) fits inside the image.
     for _ in range(40):
         if text_width <= max_text_w:
             break
@@ -101,8 +99,6 @@ def _overlay_quote_on_image_sync(image_b64: str, quote: str) -> Tuple[str, str]:
         wrapped_text = _wrap_text(quote, width=wrap_cols)
         bbox, text_width, text_height = _measure_block()
 
-    # Pillow: align="center" uses x as anchor inconsistently across versions; center explicitly
-    # using the text bbox offset (left/top) and align="left".
     stroke_w = max(1, font_size // 22)
     left, top, right, bottom = bbox
     text_width = right - left
@@ -110,7 +106,6 @@ def _overlay_quote_on_image_sync(image_b64: str, quote: str) -> Tuple[str, str]:
     x = (W - text_width) // 2 - left
     y = max(margin // 2, (H - text_height) // 2 - top)
 
-    # Text only on the main image — no panel/box. Stroke keeps it readable on light gradients.
     draw.multiline_text(
         (x, y),
         wrapped_text,
@@ -180,7 +175,11 @@ def _generate_quote_text_sync(user_prompt: str) -> str:
         )
     except botocore.exceptions.ClientError as e:
         error_message = e.response.get("Error", {}).get("Message", str(e))
-        logger.exception("quote-cards: step=llm_quote error model=%s elapsed_ms=%d", model_id, int((time.perf_counter() - t0) * 1000))
+        logger.exception(
+            "quote-cards: step=llm_quote error model=%s elapsed_ms=%d",
+            model_id,
+            int((time.perf_counter() - t0) * 1000),
+        )
         raise RuntimeError(f"Bedrock Claude Haiku error: {error_message}") from e
 
     payload = json.loads(response["body"].read())
@@ -188,7 +187,11 @@ def _generate_quote_text_sync(user_prompt: str) -> str:
     text_parts = [part.get("text", "") for part in content if isinstance(part, dict)]
     quote = " ".join(part.strip() for part in text_parts if part.strip()).strip()
     if not quote:
-        logger.error("quote-cards: step=llm_quote empty_result model=%s elapsed_ms=%d", model_id, int((time.perf_counter() - t0) * 1000))
+        logger.error(
+            "quote-cards: step=llm_quote empty_result model=%s elapsed_ms=%d",
+            model_id,
+            int((time.perf_counter() - t0) * 1000),
+        )
         raise RuntimeError("Claude Haiku returned an empty quote.")
 
     quote = quote.strip().strip('"')
@@ -199,28 +202,6 @@ def _generate_quote_text_sync(user_prompt: str) -> str:
         len(quote),
     )
     return quote
-
-
-# ---------------------------------------------------------------------------
-# Text-in-image via FLUX (embed quote in prompt) — unreliable spelling; kept for reference.
-# _QUOTE_CARD_STYLE_PROMPT = (
-#     "Minimal aesthetic background, soft gradient, pastel colors, instagram quote card style, "
-#     "modern clean typography, centered composition, highly legible quote text, "
-#     "balanced spacing, premium social-media design."
-# )
-#
-# def _build_embedded_quote_prompt(quote_text: str) -> str:
-#     return (
-#         f"{_QUOTE_CARD_STYLE_PROMPT} "
-#         f'Render this exact quote text prominently and accurately in the image: "{quote_text}". '
-#         "Use one centered text block, high contrast between text and background, "
-#         "clean sans-serif look, no extra text, no watermark, no logo."
-#     )
-# In generate_quote_card_base64:
-#     embedded_prompt = _build_embedded_quote_prompt(quote_text)
-#     logger.info("quote-cards: step=image_with_text start model=%s", _QUOTE_CARD_MODEL)
-#     mime_type, final_image_base64 = await generate_image_base64(_QUOTE_CARD_MODEL, embedded_prompt)
-# ---------------------------------------------------------------------------
 
 
 async def generate_quote_card_base64(user_prompt: str) -> Tuple[str, str, str]:
@@ -238,3 +219,9 @@ async def generate_quote_card_base64(user_prompt: str) -> Tuple[str, str, str]:
 
     logger.info("quote-cards: done elapsed_ms=%d", int((time.perf_counter() - req_t0) * 1000))
     return quote_text, mime_type, final_image_base64
+
+
+__all__ = [
+    "generate_quote_card_base64",
+]
+

@@ -1,7 +1,8 @@
+from typing import Tuple
+
 import asyncio
 import base64
 import os
-from typing import Tuple
 
 from dotenv import load_dotenv
 from huggingface_hub import InferenceClient
@@ -9,7 +10,6 @@ from huggingface_hub import InferenceClient
 load_dotenv()
 
 VIDEO_MODELS = [
-    # "Wan-AI/Wan2.2-T2V-A14B-Diffusers",
     "amazon.nova-reel-v1:1",
 ]
 
@@ -30,10 +30,8 @@ def _generate_nova_reel_video_sync(prompt: str) -> Tuple[str, str]:
         raise RuntimeError("Missing AWS credentials in environment for Amazon Nova Reel model.")
 
     AWS_REGION = "us-east-1"
-    SLEEP_SECONDS = 15
+    SLEEP_SECONDS = 30
 
-    # Bedrock async video generation requires an S3 output location,
-    # but we immediately read the file and return it to the UI.
     bucket_uri = os.getenv("NOVA_REEL_BUCKET")
     if not bucket_uri:
         raise RuntimeError("Missing NOVA_REEL_BUCKET environment variable for Nova Reel output.")
@@ -76,12 +74,8 @@ def _generate_nova_reel_video_sync(prompt: str) -> Tuple[str, str]:
     if status != "Completed":
         raise RuntimeError(f"Video generation status: {status}")
 
-    # When completed, Bedrock writes output.mp4 under
-    # <bucket>/<job_id>/output.mp4. We derive the job_id from the ARN.
     job_id = invocation_arn.split("/")[-1]
 
-    # Parse bucket and key from the configured URI.
-    # bucket_uri looks like s3://bucket-name/optional-prefix
     without_scheme = bucket_uri[len("s3://") :]
     if "/" in without_scheme:
         bucket_name, base_prefix = without_scheme.split("/", 1)
@@ -115,10 +109,8 @@ async def generate_video_base64(model: str, prompt: str) -> Tuple[str, str]:
         raise ValueError(f"Unknown video model: {model}")
 
     if model == _NOVA_REEL_MODEL:
-        # Use AWS Bedrock Nova Reel for video generation.
         return await asyncio.to_thread(_generate_nova_reel_video_sync, prompt)
 
-    # Default path: Hugging Face text-to-video (e.g., Wan-AI).
     client = InferenceClient(
         api_key=os.getenv("HF_TOKEN"),
     )
@@ -131,3 +123,10 @@ async def generate_video_base64(model: str, prompt: str) -> Tuple[str, str]:
     mime_type = "video/mp4"
     video_base64 = base64.b64encode(video_bytes).decode("ascii")
     return mime_type, video_base64
+
+
+__all__ = [
+    "VIDEO_MODELS",
+    "generate_video_base64",
+]
+
