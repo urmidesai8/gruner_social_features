@@ -35,12 +35,21 @@ async function loadModels() {
       const vSelect = document.getElementById("videoModel");
       if (vSelect) {
         vSelect.innerHTML = "";
+        const DISABLED_VIDEO_MODELS = ["Wan-AI/Wan2.2-T2V-A14B-Diffusers"];
+        let firstEnabledVideoValue = null;
         for (const m of vModels) {
           const opt = document.createElement("option");
           opt.value = m;
           opt.textContent = m;
+          if (DISABLED_VIDEO_MODELS.includes(m)) {
+            opt.disabled = true;
+            opt.textContent = `${m} (disabled)`;
+          } else if (!firstEnabledVideoValue) {
+            firstEnabledVideoValue = m;
+          }
           vSelect.appendChild(opt);
         }
+        if (firstEnabledVideoValue) vSelect.value = firstEnabledVideoValue;
       }
     }
   } catch(e) {
@@ -49,7 +58,13 @@ async function loadModels() {
 }
 
 function setStatus(text, type="image") {
-  document.getElementById(type === "image" ? "status" : "videoStatus").textContent = text;
+  const idByType = {
+    image: "status",
+    video: "videoStatus",
+    text: "textStatus",
+  };
+  const el = document.getElementById(idByType[type] || "status");
+  if (el) el.textContent = text;
 }
 
 function setReply(text) {
@@ -77,9 +92,27 @@ function setVideo(data) {
   vid.style.display = 'block';
 }
 
+function setQuoteCard(data) {
+  const img = document.getElementById("textImage");
+  if (!img) return;
+  if (!data || !data.image_base64) {
+    img.removeAttribute("src");
+    img.style.display = "none";
+    return;
+  }
+  img.src = `data:${data.mime_type};base64,${data.image_base64}`;
+  img.style.display = "block";
+}
+
 async function generateVideo() {
   const model = document.getElementById("videoModel").value;
   const prompt = document.getElementById("videoPrompt").value.trim();
+
+  const DISABLED_VIDEO_MODELS = ["Wan-AI/Wan2.2-T2V-A14B-Diffusers"];
+  if (DISABLED_VIDEO_MODELS.includes(model)) {
+    setStatus("This video model is disabled in the UI.", "video");
+    return;
+  }
 
   if (!prompt) {
     setStatus("Please enter a prompt.", "video");
@@ -107,6 +140,33 @@ async function generateVideo() {
 
   setStatus("Done.", "video");
   setVideo(data);
+}
+
+async function generateQuoteCard() {
+  const prompt = document.getElementById("textPrompt").value.trim();
+  if (!prompt) {
+    setStatus("Please enter a prompt.", "text");
+    return;
+  }
+
+  setStatus("Generating quote card...", "text");
+  setQuoteCard(null);
+
+  const res = await fetch("/api/generate-quote-card", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ prompt }),
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const detail = data && data.detail ? data.detail : res.statusText;
+    setStatus(`Error: ${detail}`, "text");
+    return;
+  }
+
+  setStatus("Done.", "text");
+  setQuoteCard(data);
 }
 
 async function generate() {
@@ -180,6 +240,22 @@ async function main() {
       document.getElementById("videoPrompt").value = "";
       setVideo(null);
       setStatus("", "video");
+    });
+  }
+
+  const genTextBtn = document.getElementById("generateTextBtn");
+  if (genTextBtn) {
+    genTextBtn.addEventListener("click", () => {
+      generateQuoteCard().catch((err) => setStatus(`Error: ${err.message || err}`, "text"));
+    });
+  }
+
+  const clearTextBtn = document.getElementById("clearTextBtn");
+  if (clearTextBtn) {
+    clearTextBtn.addEventListener("click", () => {
+      document.getElementById("textPrompt").value = "";
+      setQuoteCard(null);
+      setStatus("", "text");
     });
   }
 }

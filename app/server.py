@@ -7,17 +7,19 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.ai import MODELS, generate_image_base64
+from app.text import generate_quote_card_base64
 from app.video import VIDEO_MODELS, generate_video_base64
 from app.schemas import (
     ChatRequest, ChatResponse, 
     GenerateImageRequest, GenerateImageResponse,
-    GenerateVideoRequest, GenerateVideoResponse
+    GenerateVideoRequest, GenerateVideoResponse,
+    GenerateQuoteCardRequest, GenerateQuoteCardResponse,
 )
 
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
 
-app = FastAPI(title="gruner_social_features image chatbot")
+app = FastAPI(title="Gruner Social AI Features")
 
 app.add_middleware(
     CORSMiddleware,
@@ -74,6 +76,26 @@ async def generate_video(req: GenerateVideoRequest) -> GenerateVideoResponse:
         prompt=req.prompt,
         mime_type=mime_type,
         video_base64=video_base64,
+    )
+
+
+@app.post("/api/generate-quote-card", response_model=GenerateQuoteCardResponse)
+async def generate_quote_card(req: GenerateQuoteCardRequest) -> GenerateQuoteCardResponse:
+    prompt = (req.prompt or "").strip()
+    if not prompt:
+        raise HTTPException(status_code=400, detail="Missing prompt.")
+    try:
+        quote_text, mime_type, image_base64 = await generate_quote_card_base64(prompt)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+    return GenerateQuoteCardResponse(
+        prompt=prompt,
+        quote_text=quote_text,
+        mime_type=mime_type,
+        image_base64=image_base64,
     )
 
 def _extract_prompt(req: ChatRequest) -> Optional[str]:

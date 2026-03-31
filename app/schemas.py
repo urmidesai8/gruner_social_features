@@ -38,6 +38,17 @@ class GenerateVideoResponse(BaseModel):
     video_base64: str
 
 
+class GenerateQuoteCardRequest(BaseModel):
+    prompt: str
+
+
+class GenerateQuoteCardResponse(BaseModel):
+    prompt: str
+    quote_text: str
+    mime_type: str
+    image_base64: str
+
+
 class ChatResponse(BaseModel):
     model: str
     reply: str

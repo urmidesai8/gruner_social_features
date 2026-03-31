@@ -300,6 +300,7 @@
       <div class="tabs">
         <button class="tab-btn active" id="tabImage">Image</button>
         <button class="tab-btn" id="tabVideo">Video</button>
+        <button class="tab-btn" id="tabText">Text</button>
       </div>
 
       <!-- Image Tab Content -->
@@ -357,19 +358,44 @@
         </div>
       </div>
 
+      <!-- Text Tab Content -->
+      <div class="tab-content hidden" id="contentText">
+        <div class="input-group">
+          <label for="textPrompt">Quote Card Theme</label>
+          <textarea id="textPrompt" placeholder="Write a theme for your quote card, e.g. resilience, self-growth, focus..."></textarea>
+        </div>
+
+        <div class="actions">
+          <button id="generateTextBtn" class="primary-btn">Generate Quote Card</button>
+          <button id="clearTextBtn" class="secondary-btn" type="button">Clear</button>
+        </div>
+
+        <div class="status-container">
+          <div id="textStatus"></div>
+        </div>
+
+        <div class="image-container" id="textContainer">
+          <span class="loader" id="textLoader" style="display: none;"></span>
+          <img id="textImage" alt="Generated quote card will appear here" style="display: none;" />
+        </div>
+      </div>
+
       <div class="footer-text">
         Powered by AI Inference Networks
       </div>
     </div>
 
     <!-- Ensure existing JS can find these IDs for the image generation specifically -->
-    <script src="/static/app.js"></script>
+    <!-- Cache-bust to ensure latest app.js is loaded in browser -->
+    <script src="/static/app.js?v=2"></script>
     <script>
       // DOM Elements
       const tabImageBtn = document.getElementById('tabImage');
       const tabVideoBtn = document.getElementById('tabVideo');
+      const tabTextBtn = document.getElementById('tabText');
       const contentImage = document.getElementById('contentImage');
       const contentVideo = document.getElementById('contentVideo');
+      const contentText = document.getElementById('contentText');
 
       const generateBtnElement = document.getElementById('generateBtn');
       const imageElement = document.getElementById('image');
@@ -381,15 +407,28 @@
       tabImageBtn.addEventListener('click', () => {
         tabImageBtn.classList.add('active');
         tabVideoBtn.classList.remove('active');
+        tabTextBtn.classList.remove('active');
         contentImage.classList.remove('hidden');
         contentVideo.classList.add('hidden');
+        contentText.classList.add('hidden');
       });
 
       tabVideoBtn.addEventListener('click', () => {
         tabVideoBtn.classList.add('active');
         tabImageBtn.classList.remove('active');
+        tabTextBtn.classList.remove('active');
         contentVideo.classList.remove('hidden');
         contentImage.classList.add('hidden');
+        contentText.classList.add('hidden');
+      });
+
+      tabTextBtn.addEventListener('click', () => {
+        tabTextBtn.classList.add('active');
+        tabImageBtn.classList.remove('active');
+        tabVideoBtn.classList.remove('active');
+        contentText.classList.remove('hidden');
+        contentImage.classList.add('hidden');
+        contentVideo.classList.add('hidden');
       });
 
       // Observe the src attribute of the image to hide loader and show image
@@ -447,6 +486,11 @@
       const videoLoaderElement = document.getElementById('videoLoader');
       const generateVideoBtnElement = document.getElementById('generateVideoBtn');
       const clearVideoBtnElement = document.getElementById('clearVideoBtn');
+      const textImageElement = document.getElementById('textImage');
+      const textStatusElement = document.getElementById('textStatus');
+      const textLoaderElement = document.getElementById('textLoader');
+      const generateTextBtnElement = document.getElementById('generateTextBtn');
+      const clearTextBtnElement = document.getElementById('clearTextBtn');
 
       // Observe the src attribute of the video to hide loader and show video
       const videoObserver = new MutationObserver((mutations) => {
@@ -502,6 +546,64 @@
               videoElement.style.display = 'none';
               videoLoaderElement.style.display = 'none';
               videoStatusElement.textContent = '';
+          });
+      }
+
+      // Observe the src attribute of the text image to hide loader and show image
+      const textObserver = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+          if (mutation.type === 'attributes' && mutation.attributeName === 'src') {
+             if(textImageElement.getAttribute('src')) {
+                textImageElement.style.display = 'block';
+                textLoaderElement.style.display = 'none';
+                textImageElement.style.opacity = '1';
+             }
+          }
+        });
+      });
+      if(textImageElement) {
+          textObserver.observe(textImageElement, { attributes: true });
+      }
+
+      // Observe text status element to stop loader on error
+      const textStatusObserver = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+          if (mutation.type === 'childList' || mutation.type === 'characterData') {
+            const text = textStatusElement.textContent || '';
+            if (text.toLowerCase().includes('error') || text === 'Done.') {
+               textLoaderElement.style.display = 'none';
+               if (text.toLowerCase().includes('error')) {
+                 textStatusElement.classList.add('error');
+               } else {
+                 textStatusElement.classList.remove('error');
+               }
+            } else {
+               textStatusElement.classList.remove('error');
+            }
+          }
+        });
+      });
+      if(textStatusElement) {
+          textStatusObserver.observe(textStatusElement, { childList: true, characterData: true, subtree: true });
+      }
+
+      // Patch the generate text button to show loader
+      if(generateTextBtnElement) {
+          generateTextBtnElement.addEventListener('click', () => {
+             if(document.getElementById('textPrompt').value.trim() !== '') {
+                textImageElement.style.opacity = '0.3';
+                textLoaderElement.style.display = 'block';
+             }
+          });
+      }
+
+      // Patch clear text button
+      if(clearTextBtnElement) {
+          clearTextBtnElement.addEventListener('click', () => {
+              textImageElement.removeAttribute('src');
+              textImageElement.style.display = 'none';
+              textLoaderElement.style.display = 'none';
+              textStatusElement.textContent = '';
           });
       }
     </script>
