@@ -92,6 +92,16 @@ class SummarizePostResponse(BaseModel):
     result: str
 
 
+class ImageCaptioningRequest(BaseModel):
+    image_base64: str
+    mime_type: Optional[str] = None
+
+
+class ImageCaptioningResponse(BaseModel):
+    blip_caption: str
+    captions: dict[str, str]
+
+
 class ChatResponse(BaseModel):
     model: str
     reply: str

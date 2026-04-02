@@ -64,6 +64,7 @@ function setStatus(text, type="image") {
     text: "textStatus",
     copilot: "copilotStatus",
     summarize: "summarizeStatus",
+    caption: "captionStatus",
   };
   const el = document.getElementById(idByType[type] || "status");
   if (el) el.textContent = text;
@@ -214,6 +215,51 @@ async function enhanceUploadedImage() {
 
   setStatus("Done.", "image");
   setImage(data);
+}
+
+async function generateCaptionOptions() {
+  const fileInput = document.getElementById("captionImageInput");
+  const file = fileInput && fileInput.files ? fileInput.files[0] : null;
+  const output = document.getElementById("captionOptionsOutput");
+  if (!file) {
+    setStatus("Please choose an image for captioning.", "caption");
+    return;
+  }
+
+  setStatus("Generating caption options with AI...", "caption");
+  if (output) output.value = "";
+
+  const dataUrl = await readFileAsDataUrl(file);
+  const res = await fetch("/api/image-captioning", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      image_base64: dataUrl,
+      mime_type: file.type || "image/png",
+    }),
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const detail = data && data.detail ? data.detail : res.statusText;
+    setStatus(`Error: ${detail}`, "caption");
+    return;
+  }
+
+  setStatus("Done.", "caption");
+  if (!output) return;
+
+  const captions = data.captions || {};
+  const blipCaption = data.blip_caption || "";
+  output.value = [
+    `BLIP caption: ${blipCaption}`,
+    "",
+    `poetic: ${captions.poetic || ""}`,
+    `funny: ${captions.funny || ""}`,
+    `aesthetic: ${captions.aesthetic || ""}`,
+    `short: ${captions.short || ""}`,
+    `deep: ${captions.deep || ""}`,
+  ].join("\n");
 }
 
 async function generateCopilot() {
@@ -425,6 +471,24 @@ async function main() {
       const ep = document.getElementById("enhancePrompt");
       if (ep) ep.value = "";
       setStatus("", "image");
+    });
+  }
+
+  const genCaptionBtn = document.getElementById("generateCaptionOptionsBtn");
+  if (genCaptionBtn) {
+    genCaptionBtn.addEventListener("click", () => {
+      generateCaptionOptions().catch((err) => setStatus(`Error: ${err.message || err}`, "caption"));
+    });
+  }
+
+  const clearCaptionBtn = document.getElementById("clearCaptionOptionsBtn");
+  if (clearCaptionBtn) {
+    clearCaptionBtn.addEventListener("click", () => {
+      const fileInput = document.getElementById("captionImageInput");
+      if (fileInput) fileInput.value = "";
+      const output = document.getElementById("captionOptionsOutput");
+      if (output) output.value = "";
+      setStatus("", "caption");
     });
   }
 }

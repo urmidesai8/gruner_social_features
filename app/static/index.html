@@ -340,6 +340,36 @@
           <button id="clearEnhanceBtn" class="secondary-btn" type="button">Clear Upload</button>
         </div>
 
+        <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 1.5rem 0;" />
+
+        <div class="input-group">
+          <label for="captionImageInput">Image for captioning</label>
+          <input id="captionImageInput" type="file" accept="image/*" />
+        </div>
+
+        <div class="input-group">
+          <label for="captionOptionsOutput">Caption Options (AI)</label>
+          <textarea
+            id="captionOptionsOutput"
+            readonly
+            placeholder="Choose an image above, then click “Generate Caption Options (AI)”."
+            rows="8"
+          ></textarea>
+        </div>
+
+        <div class="actions">
+          <button id="generateCaptionOptionsBtn" class="primary-btn" type="button">
+            Generate Caption Options (AI)
+          </button>
+          <button id="clearCaptionOptionsBtn" class="secondary-btn" type="button">
+            Clear Captions
+          </button>
+        </div>
+
+        <div class="status-container">
+          <div id="captionStatus"></div>
+        </div>
+
         <div class="status-container">
           <div id="status"></div>
         </div>
@@ -467,7 +497,7 @@
 
     <!-- Ensure existing JS can find these IDs for the image generation specifically -->
     <!-- Cache-bust to ensure latest app.js is loaded in browser -->
-    <script src="/static/app.js?v=6"></script>
+    <script src="/static/app.js?v=9"></script>
     <script>
       // DOM Elements
       const tabImageBtn = document.getElementById('tabImage');
