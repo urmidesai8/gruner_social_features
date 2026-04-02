@@ -12,7 +12,7 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
-from app.services.image import generate_image_base64
+from app.services.image_generation import generate_image_base64
 
 _QUOTE_CARD_MODEL = "stabilityai/stable-diffusion-xl-base-1.0"
 _QUOTE_BG_ONLY_PROMPT = (
@@ -139,7 +139,11 @@ def _generate_quote_text_sync(user_prompt: str) -> str:
         raise RuntimeError("Missing BEDROCK_CLAUDE_HAIKU_ID in environment.")
 
     t0 = time.perf_counter()
-    logger.info("quote-cards: step=llm_quote start model=%s prompt_len=%d", model_id, len(user_prompt or ""))
+    logger.info(
+        "quote-cards: step=llm_quote start model=%s prompt_len=%d",
+        model_id,
+        len(user_prompt or ""),
+    )
 
     aws_access_key_id = os.getenv("AWS_ACCESS_KEY")
     aws_secret_access_key = os.getenv("AWS_SECRET_KEY")
@@ -213,11 +217,19 @@ async def generate_quote_card_base64(user_prompt: str) -> Tuple[str, str, str]:
     bg_t0 = time.perf_counter()
     logger.info("quote-cards: step=flux_background start model=%s", _QUOTE_CARD_MODEL)
     _, bg_base64 = await generate_image_base64(_QUOTE_CARD_MODEL, _QUOTE_BG_ONLY_PROMPT)
-    logger.info("quote-cards: step=flux_background done elapsed_ms=%d", int((time.perf_counter() - bg_t0) * 1000))
+    logger.info(
+        "quote-cards: step=flux_background done elapsed_ms=%d",
+        int((time.perf_counter() - bg_t0) * 1000),
+    )
 
-    mime_type, final_image_base64 = await asyncio.to_thread(_overlay_quote_on_image_sync, bg_base64, quote_text)
+    mime_type, final_image_base64 = await asyncio.to_thread(
+        _overlay_quote_on_image_sync, bg_base64, quote_text
+    )
 
-    logger.info("quote-cards: done elapsed_ms=%d", int((time.perf_counter() - req_t0) * 1000))
+    logger.info(
+        "quote-cards: done elapsed_ms=%d",
+        int((time.perf_counter() - req_t0) * 1000),
+    )
     return quote_text, mime_type, final_image_base64
 
 

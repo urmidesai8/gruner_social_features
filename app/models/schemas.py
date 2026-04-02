@@ -1,3 +1,4 @@
+from enum import Enum
 from typing import List, Literal, Optional
 
 from pydantic import BaseModel, Field
@@ -26,6 +27,22 @@ class GenerateImageResponse(BaseModel):
     image_base64: str
 
 
+class EnhanceImageRequest(BaseModel):
+    image_base64: str
+    mime_type: Optional[str] = None
+    prompt: Optional[str] = Field(
+        default=None,
+        description="Optional edits (e.g. color grade, crop, object changes) in addition to default enhancement.",
+    )
+
+
+class EnhanceImageResponse(BaseModel):
+    model: str
+    prompt: str
+    mime_type: str
+    image_base64: str
+
+
 class GenerateVideoRequest(BaseModel):
     model: str
     prompt: str
@@ -47,6 +64,32 @@ class GenerateQuoteCardResponse(BaseModel):
     quote_text: str
     mime_type: str
     image_base64: str
+
+
+class CopilotMode(str, Enum):
+    GENERATE = "generate"
+    REWRITE = "rewrite"
+    IDEAS = "ideas"
+
+
+class ContentCopilotRequest(BaseModel):
+    mode: CopilotMode = CopilotMode.GENERATE
+    text: str
+
+
+class ContentCopilotResponse(BaseModel):
+    mode: CopilotMode
+    original_text: str
+    result: str
+
+
+class SummarizePostRequest(BaseModel):
+    text: str = Field(..., description="Long post or article excerpt to summarise in plain language.")
+
+
+class SummarizePostResponse(BaseModel):
+    original_text: str
+    result: str
 
 
 class ChatResponse(BaseModel):

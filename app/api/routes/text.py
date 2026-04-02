@@ -1,10 +1,16 @@
 from fastapi import APIRouter, HTTPException
 
 from app.models.schemas import (
+    ContentCopilotRequest,
+    ContentCopilotResponse,
     GenerateQuoteCardRequest,
     GenerateQuoteCardResponse,
+    SummarizePostRequest,
+    SummarizePostResponse,
 )
-from app.services.text import generate_quote_card_base64
+from app.services.content_copilot import generate_copilot_text
+from app.services.quote_card_generation import generate_quote_card_base64
+from app.services.summarize_post import summarize_post_text
 
 
 router = APIRouter(prefix="/api", tags=["text"])
@@ -28,4 +34,38 @@ async def generate_quote_card(req: GenerateQuoteCardRequest) -> GenerateQuoteCar
         mime_type=mime_type,
         image_base64=image_base64,
     )
+
+
+@router.post("/content-copilot", response_model=ContentCopilotResponse)
+async def content_copilot(req: ContentCopilotRequest) -> ContentCopilotResponse:
+    text = (req.text or "").strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="Missing text.")
+    try:
+        result = await generate_copilot_text(req.mode.value, text)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+    return ContentCopilotResponse(
+        mode=req.mode,
+        original_text=text,
+        result=result,
+    )
+
+
+@router.post("/summarize-post", response_model=SummarizePostResponse)
+async def summarize_post(req: SummarizePostRequest) -> SummarizePostResponse:
+    text = (req.text or "").strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="Missing text.")
+    try:
+        result = await summarize_post_text(text)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+    return SummarizePostResponse(original_text=text, result=result)
 

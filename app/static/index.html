@@ -320,6 +320,26 @@
           <button id="clearBtn" class="secondary-btn" type="button">Clear</button>
         </div>
 
+        <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 1rem 0;" />
+
+        <div class="input-group">
+          <label for="enhanceImageInput">Image Enhancer</label>
+          <input id="enhanceImageInput" type="file" accept="image/*" />
+        </div>
+
+        <div class="input-group">
+          <label for="enhancePrompt">Enhancement &amp; edit instructions (optional)</label>
+          <textarea
+            id="enhancePrompt"
+            placeholder="Default: better lighting, clarity, and framing. Add specifics, e.g. warmer tones, brighter foreground, remove background clutter, reframe as portrait..."
+          ></textarea>
+        </div>
+
+        <div class="actions">
+          <button id="enhanceBtn" class="primary-btn">Enhance Uploaded Image</button>
+          <button id="clearEnhanceBtn" class="secondary-btn" type="button">Clear Upload</button>
+        </div>
+
         <div class="status-container">
           <div id="status"></div>
         </div>
@@ -378,6 +398,66 @@
           <span class="loader" id="textLoader" style="display: none;"></span>
           <img id="textImage" alt="Generated quote card will appear here" style="display: none;" />
         </div>
+
+        <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 1.5rem 0;" />
+
+        <div class="input-group">
+          <label for="copilotInput">AI Content Co-Pilot</label>
+          <select id="copilotMode">
+            <option value="generate">Caption generation</option>
+            <option value="rewrite">Caption rewrite / improvement</option>
+            <option value="ideas">Post ideas / brainstorming</option>
+          </select>
+        </div>
+
+        <div class="input-group">
+          <label for="copilotInput">Your Idea or Caption</label>
+          <textarea id="copilotInput" placeholder='E.g. \"First day at new job\" or paste an existing caption to improve...'></textarea>
+        </div>
+
+        <div class="actions">
+          <button id="generateCopilotBtn" class="primary-btn">Generate Content</button>
+          <button id="clearCopilotBtn" class="secondary-btn" type="button">Clear</button>
+        </div>
+
+        <div class="status-container">
+          <div id="copilotStatus"></div>
+        </div>
+
+        <div class="input-group">
+          <label for="copilotOutput">AI Suggestion</label>
+          <textarea id="copilotOutput" readonly placeholder="Your AI-assisted caption or ideas will appear here."></textarea>
+        </div>
+
+        <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 1.5rem 0;" />
+
+        <div class="input-group">
+          <label for="summarizeInput">Explain / Summarise (AI)</label>
+          <textarea
+            id="summarizeInput"
+            placeholder="Paste a long post, article snippet, or thread. You’ll get a few easy bullet points."
+            rows="6"
+          ></textarea>
+        </div>
+
+        <div class="actions">
+          <button id="summarizeBtn" class="primary-btn" type="button">Summarise / Simplify</button>
+          <button id="clearSummarizeBtn" class="secondary-btn" type="button">Clear</button>
+        </div>
+
+        <div class="status-container">
+          <div id="summarizeStatus"></div>
+        </div>
+
+        <div class="input-group">
+          <label for="summarizeOutput">Easy summary</label>
+          <textarea
+            id="summarizeOutput"
+            readonly
+            placeholder="3–5 plain-language bullet points will appear here."
+            rows="8"
+          ></textarea>
+        </div>
       </div>
 
       <div class="footer-text">
@@ -387,7 +467,7 @@
 
     <!-- Ensure existing JS can find these IDs for the image generation specifically -->
     <!-- Cache-bust to ensure latest app.js is loaded in browser -->
-    <script src="/static/app.js?v=2"></script>
+    <script src="/static/app.js?v=6"></script>
     <script>
       // DOM Elements
       const tabImageBtn = document.getElementById('tabImage');

@@ -3,7 +3,7 @@ from typing import Dict
 from fastapi import APIRouter, HTTPException
 
 from app.models.schemas import GenerateVideoRequest, GenerateVideoResponse
-from app.services.video import VIDEO_MODELS, generate_video_base64
+from app.services.video_generation import VIDEO_MODELS, generate_video_base64
 
 
 router = APIRouter(prefix="/api", tags=["video"])

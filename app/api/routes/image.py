@@ -5,10 +5,13 @@ from fastapi import APIRouter, HTTPException
 from app.models.schemas import (
     ChatRequest,
     ChatResponse,
+    EnhanceImageRequest,
+    EnhanceImageResponse,
     GenerateImageRequest,
     GenerateImageResponse,
 )
-from app.services.image import MODELS, generate_image_base64
+from app.services.image_enhancement import enhance_image_base64
+from app.services.image_generation import MODELS, generate_image_base64
 from app.api.deps import extract_prompt
 
 
@@ -36,6 +39,26 @@ async def generate_image(req: GenerateImageRequest) -> GenerateImageResponse:
     )
 
 
+@router.post("/enhance-image", response_model=EnhanceImageResponse)
+async def enhance_image(req: EnhanceImageRequest) -> EnhanceImageResponse:
+    if not req.image_base64 or not req.image_base64.strip():
+        raise HTTPException(status_code=400, detail="Missing image_base64.")
+    try:
+        prompt, mime_type, image_base64 = await enhance_image_base64(
+            req.image_base64, req.prompt
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+    return EnhanceImageResponse(
+        model="black-forest-labs/FLUX.2-klein-9b-kv",
+        prompt=prompt,
+        mime_type=mime_type,
+        image_base64=image_base64,
+    )
+
+
 @router.post("/chat", response_model=ChatResponse)
 async def chat(req: ChatRequest) -> ChatResponse:
     prompt = extract_prompt(req)
@@ -54,6 +77,6 @@ async def chat(req: ChatRequest) -> ChatResponse:
         model=req.model,
         reply=reply,
         mime_type=mime_type,
-        image_base64=image_base64,
+        image_base64=image_base64, 
     )
 

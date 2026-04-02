@@ -62,6 +62,8 @@ function setStatus(text, type="image") {
     image: "status",
     video: "videoStatus",
     text: "textStatus",
+    copilot: "copilotStatus",
+    summarize: "summarizeStatus",
   };
   const el = document.getElementById(idByType[type] || "status");
   if (el) el.textContent = text;
@@ -102,6 +104,15 @@ function setQuoteCard(data) {
   }
   img.src = `data:${data.mime_type};base64,${data.image_base64}`;
   img.style.display = "block";
+}
+
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error("Failed to read selected file."));
+    reader.readAsDataURL(file);
+  });
 }
 
 async function generateVideo() {
@@ -167,6 +178,108 @@ async function generateQuoteCard() {
 
   setStatus("Done.", "text");
   setQuoteCard(data);
+}
+
+async function enhanceUploadedImage() {
+  const fileInput = document.getElementById("enhanceImageInput");
+  const file = fileInput && fileInput.files ? fileInput.files[0] : null;
+  if (!file) {
+    setStatus("Please upload an image first.", "image");
+    return;
+  }
+
+  setStatus("Enhancing image...", "image");
+  setImage(null);
+
+  const dataUrl = await readFileAsDataUrl(file);
+  const enhancePromptEl = document.getElementById("enhancePrompt");
+  const enhancePrompt =
+    enhancePromptEl && enhancePromptEl.value ? enhancePromptEl.value.trim() : "";
+  const res = await fetch("/api/enhance-image", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      image_base64: dataUrl,
+      mime_type: file.type || "image/png",
+      ...(enhancePrompt ? { prompt: enhancePrompt } : {}),
+    }),
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const detail = data && data.detail ? data.detail : res.statusText;
+    setStatus(`Error: ${detail}`, "image");
+    return;
+  }
+
+  setStatus("Done.", "image");
+  setImage(data);
+}
+
+async function generateCopilot() {
+  const mode = document.getElementById("copilotMode").value;
+  const text = document.getElementById("copilotInput").value.trim();
+  const output = document.getElementById("copilotOutput");
+
+  if (!text) {
+    setStatus("Please enter an idea or caption.", "copilot");
+    return;
+  }
+
+  setStatus("Generating with AI Content Co-Pilot...", "copilot");
+  if (output) {
+    output.value = "";
+  }
+
+  const res = await fetch("/api/content-copilot", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ mode, text }),
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const detail = data && data.detail ? data.detail : res.statusText;
+    setStatus(`Error: ${detail}`, "copilot");
+    return;
+  }
+
+  setStatus("Done.", "copilot");
+  if (output && data && data.result) {
+    output.value = data.result;
+  }
+}
+
+async function summarizePost() {
+  const input = document.getElementById("summarizeInput");
+  const output = document.getElementById("summarizeOutput");
+  const text = input && input.value ? input.value.trim() : "";
+
+  if (!text) {
+    setStatus("Paste some text to summarise.", "summarize");
+    return;
+  }
+
+  setStatus("Summarising with AI...", "summarize");
+  if (output) output.value = "";
+
+  const res = await fetch("/api/summarize-post", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text }),
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const detail = data && data.detail ? data.detail : res.statusText;
+    setStatus(`Error: ${detail}`, "summarize");
+    return;
+  }
+
+  setStatus("Done.", "summarize");
+  if (output && data && data.result) {
+    output.value = data.result;
+  }
 }
 
 async function generate() {
@@ -256,6 +369,62 @@ async function main() {
       document.getElementById("textPrompt").value = "";
       setQuoteCard(null);
       setStatus("", "text");
+    });
+  }
+
+  const genCopilotBtn = document.getElementById("generateCopilotBtn");
+  if (genCopilotBtn) {
+    genCopilotBtn.addEventListener("click", () => {
+      generateCopilot().catch((err) => setStatus(`Error: ${err.message || err}`, "copilot"));
+    });
+  }
+
+  const clearCopilotBtn = document.getElementById("clearCopilotBtn");
+  if (clearCopilotBtn) {
+    clearCopilotBtn.addEventListener("click", () => {
+      const input = document.getElementById("copilotInput");
+      const output = document.getElementById("copilotOutput");
+      if (input) input.value = "";
+      if (output) output.value = "";
+      setStatus("", "copilot");
+    });
+  }
+
+  const summarizeBtn = document.getElementById("summarizeBtn");
+  if (summarizeBtn) {
+    summarizeBtn.addEventListener("click", () => {
+      summarizePost().catch((err) =>
+        setStatus(`Error: ${err.message || err}`, "summarize")
+      );
+    });
+  }
+
+  const clearSummarizeBtn = document.getElementById("clearSummarizeBtn");
+  if (clearSummarizeBtn) {
+    clearSummarizeBtn.addEventListener("click", () => {
+      const input = document.getElementById("summarizeInput");
+      const output = document.getElementById("summarizeOutput");
+      if (input) input.value = "";
+      if (output) output.value = "";
+      setStatus("", "summarize");
+    });
+  }
+
+  const enhanceBtn = document.getElementById("enhanceBtn");
+  if (enhanceBtn) {
+    enhanceBtn.addEventListener("click", () => {
+      enhanceUploadedImage().catch((err) => setStatus(`Error: ${err.message || err}`, "image"));
+    });
+  }
+
+  const clearEnhanceBtn = document.getElementById("clearEnhanceBtn");
+  if (clearEnhanceBtn) {
+    clearEnhanceBtn.addEventListener("click", () => {
+      const fileInput = document.getElementById("enhanceImageInput");
+      if (fileInput) fileInput.value = "";
+      const ep = document.getElementById("enhancePrompt");
+      if (ep) ep.value = "";
+      setStatus("", "image");
     });
   }
 }
