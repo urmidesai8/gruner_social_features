@@ -65,6 +65,7 @@ function setStatus(text, type="image") {
     copilot: "copilotStatus",
     summarize: "summarizeStatus",
     caption: "captionStatus",
+    translate: "translateStatus",
   };
   const el = document.getElementById(idByType[type] || "status");
   if (el) el.textContent = text;
@@ -296,6 +297,111 @@ async function generateCopilot() {
   }
 }
 
+async function loadTranslateLanguages() {
+  const sourceSel = document.getElementById("translateSourceLang");
+  const targetSel = document.getElementById("translateTargetLang");
+  if (!sourceSel || !targetSel) return;
+
+  const res = await fetch("/api/translate-languages");
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const detail = data && data.detail ? data.detail : res.statusText;
+    setStatus(`Could not load languages: ${detail}`, "translate");
+    targetSel.innerHTML = "";
+    const opt = document.createElement("option");
+    opt.value = "";
+    opt.textContent = "Failed to load — check AWS credentials / region";
+    targetSel.appendChild(opt);
+    return;
+  }
+
+  const langs = (data.languages || []).slice();
+  langs.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+
+  const savedSource = sourceSel.value;
+  const savedTarget = targetSel.value;
+
+  sourceSel.innerHTML = "";
+  const autoOpt = document.createElement("option");
+  autoOpt.value = "auto";
+  autoOpt.textContent = "Auto-detect";
+  sourceSel.appendChild(autoOpt);
+  for (const l of langs) {
+    const o = document.createElement("option");
+    o.value = l.code;
+    o.textContent = l.name ? `${l.name} (${l.code})` : l.code;
+    sourceSel.appendChild(o);
+  }
+  if ([...sourceSel.options].some((o) => o.value === savedSource)) {
+    sourceSel.value = savedSource;
+  }
+
+  targetSel.innerHTML = "";
+  for (const l of langs) {
+    const o = document.createElement("option");
+    o.value = l.code;
+    o.textContent = l.name ? `${l.name} (${l.code})` : l.code;
+    targetSel.appendChild(o);
+  }
+  if ([...targetSel.options].some((o) => o.value === savedTarget)) {
+    targetSel.value = savedTarget;
+  } else if (targetSel.options.length) {
+    const prefer = [...targetSel.options].find((o) => o.value === "es")
+      || [...targetSel.options].find((o) => o.value === "fr")
+      || targetSel.options[0];
+    if (prefer) targetSel.value = prefer.value;
+  }
+
+  setStatus("", "translate");
+}
+
+async function translatePost() {
+  const input = document.getElementById("translateInput");
+  const output = document.getElementById("translateOutput");
+  const sourceSel = document.getElementById("translateSourceLang");
+  const targetSel = document.getElementById("translateTargetLang");
+  const text = input && input.value ? input.value.trim() : "";
+  const source_language_code = sourceSel ? sourceSel.value : "auto";
+  const target_language = targetSel ? targetSel.value : "";
+
+  if (!text) {
+    setStatus("Enter text to translate.", "translate");
+    return;
+  }
+  if (!target_language) {
+    setStatus("Choose a target language.", "translate");
+    return;
+  }
+
+  setStatus("Translating with AWS Translate…", "translate");
+  if (output) output.value = "";
+
+  const res = await fetch("/api/translate-text", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      text,
+      source_language_code,
+      target_language,
+    }),
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const detail = data && data.detail ? data.detail : res.statusText;
+    setStatus(`Error: ${detail}`, "translate");
+    return;
+  }
+
+  setStatus(
+    `Done. (source: ${data.source_language_code || source_language_code} → target: ${data.target_language_code || target_language})`,
+    "translate"
+  );
+  if (output && data.translated_text) {
+    output.value = data.translated_text;
+  }
+}
+
 async function summarizePost() {
   const input = document.getElementById("summarizeInput");
   const output = document.getElementById("summarizeOutput");
@@ -373,6 +479,12 @@ async function main() {
     await loadModels();
   } catch (err) {
     setStatus(`Failed to load models: ${err.message || err}`);
+  }
+
+  try {
+    await loadTranslateLanguages();
+  } catch (err) {
+    setStatus(`Could not load translation languages: ${err.message || err}`, "translate");
   }
 
   document.getElementById("generateBtn").addEventListener("click", () => {
@@ -489,6 +601,26 @@ async function main() {
       const output = document.getElementById("captionOptionsOutput");
       if (output) output.value = "";
       setStatus("", "caption");
+    });
+  }
+
+  const translateBtn = document.getElementById("translateBtn");
+  if (translateBtn) {
+    translateBtn.addEventListener("click", () => {
+      translatePost().catch((err) =>
+        setStatus(`Error: ${err.message || err}`, "translate")
+      );
+    });
+  }
+
+  const clearTranslateBtn = document.getElementById("clearTranslateBtn");
+  if (clearTranslateBtn) {
+    clearTranslateBtn.addEventListener("click", () => {
+      const input = document.getElementById("translateInput");
+      const output = document.getElementById("translateOutput");
+      if (input) input.value = "";
+      if (output) output.value = "";
+      setStatus("", "translate");
     });
   }
 }

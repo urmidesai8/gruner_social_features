@@ -92,6 +92,36 @@ class SummarizePostResponse(BaseModel):
     result: str
 
 
+class TranslateLanguageItem(BaseModel):
+    code: str
+    name: str
+
+
+class TranslateLanguagesResponse(BaseModel):
+    languages: List[TranslateLanguageItem]
+
+
+class TranslateTextRequest(BaseModel):
+    text: str
+    source_language_code: str = Field(
+        default="auto",
+        description='ISO 639-1 language code, or "auto" for automatic source detection.',
+    )
+    target_language: str = Field(
+        ...,
+        description=(
+            "Target language as returned by /api/translate-languages: ISO code, display name, "
+            'or UI label such as "Spanish (es)".'
+        ),
+    )
+
+
+class TranslateTextResponse(BaseModel):
+    translated_text: str
+    source_language_code: str
+    target_language_code: str
+
+
 class ImageCaptioningRequest(BaseModel):
     image_base64: str
     mime_type: Optional[str] = None

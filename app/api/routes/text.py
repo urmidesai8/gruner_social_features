@@ -7,10 +7,15 @@ from app.models.schemas import (
     GenerateQuoteCardResponse,
     SummarizePostRequest,
     SummarizePostResponse,
+    TranslateLanguagesResponse,
+    TranslateLanguageItem,
+    TranslateTextRequest,
+    TranslateTextResponse,
 )
 from app.services.content_copilot import generate_copilot_text
 from app.services.quote_card_generation import generate_quote_card_base64
 from app.services.summarize_post import summarize_post_text
+from app.services.text_translation import list_translate_languages, translate_post_text
 
 
 router = APIRouter(prefix="/api", tags=["text"])
@@ -68,4 +73,38 @@ async def summarize_post(req: SummarizePostRequest) -> SummarizePostResponse:
         raise HTTPException(status_code=500, detail=str(e)) from e
 
     return SummarizePostResponse(original_text=text, result=result)
+
+
+@router.get("/translate-languages", response_model=TranslateLanguagesResponse)
+async def translate_languages() -> TranslateLanguagesResponse:
+    try:
+        rows = await list_translate_languages()
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+    return TranslateLanguagesResponse(
+        languages=[TranslateLanguageItem(**r) for r in rows]
+    )
+
+
+@router.post("/translate-text", response_model=TranslateTextResponse)
+async def translate_text(req: TranslateTextRequest) -> TranslateTextResponse:
+    text = (req.text or "").strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="Missing text.")
+    src = (req.source_language_code or "auto").strip().lower()
+    tgt = (req.target_language or "").strip()
+    if not tgt:
+        raise HTTPException(status_code=400, detail="Missing target_language.")
+    try:
+        out = await translate_post_text(text, src, tgt)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+    return TranslateTextResponse(
+        translated_text=out["translated_text"],
+        source_language_code=out["source_language_code"],
+        target_language_code=out["target_language_code"],
+    )
 

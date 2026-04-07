@@ -488,6 +488,50 @@
             rows="8"
           ></textarea>
         </div>
+
+        <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 1.5rem 0;" />
+
+        <div class="input-group">
+          <label for="translateSourceLang">Source language (AWS Translate)</label>
+          <select id="translateSourceLang">
+            <option value="auto">Auto-detect</option>
+          </select>
+        </div>
+
+        <div class="input-group">
+          <label for="translateTargetLang">Translate to</label>
+          <select id="translateTargetLang">
+            <option value="">Loading languages…</option>
+          </select>
+        </div>
+
+        <div class="input-group">
+          <label for="translateInput">Text to translate</label>
+          <textarea
+            id="translateInput"
+            rows="6"
+            placeholder="Paste your post or caption here (max ~10k UTF-8 bytes for standard Translate)."
+          ></textarea>
+        </div>
+
+        <div class="actions">
+          <button id="translateBtn" class="primary-btn" type="button">Translate</button>
+          <button id="clearTranslateBtn" class="secondary-btn" type="button">Clear</button>
+        </div>
+
+        <div class="status-container">
+          <div id="translateStatus"></div>
+        </div>
+
+        <div class="input-group">
+          <label for="translateOutput">Translated text</label>
+          <textarea
+            id="translateOutput"
+            readonly
+            placeholder="Translation will appear here. Detected source language is returned by AWS when using Auto-detect."
+            rows="8"
+          ></textarea>
+        </div>
       </div>
 
       <div class="footer-text">
@@ -497,7 +541,7 @@
 
     <!-- Ensure existing JS can find these IDs for the image generation specifically -->
     <!-- Cache-bust to ensure latest app.js is loaded in browser -->
-    <script src="/static/app.js?v=9"></script>
+    <script src="/static/app.js?v=10"></script>
     <script>
       // DOM Elements
       const tabImageBtn = document.getElementById('tabImage');
