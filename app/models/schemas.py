@@ -55,6 +55,27 @@ class GenerateVideoResponse(BaseModel):
     video_base64: str
 
 
+class VideoAudioTranslateRequest(BaseModel):
+    video_base64: str = Field(..., description="Base64-encoded source video (e.g. video/mp4).")
+    mime_type: str = Field(..., description="MIME type of the source video, e.g. video/mp4.")
+    target_language: str = Field(
+        ...,
+        description=(
+            "Target language as returned by /api/translate-languages: ISO code, display name, "
+            'or UI label such as "Spanish (es)".'
+        ),
+    )
+    keep_original_audio: bool = Field(
+        default=True,
+        description="If true, keep original audio as an additional track in the output video.",
+    )
+
+
+class VideoAudioTranslateResponse(BaseModel):
+    mime_type: str
+    video_base64: str
+
+
 class GenerateQuoteCardRequest(BaseModel):
     prompt: str
 

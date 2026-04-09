@@ -61,6 +61,7 @@ function setStatus(text, type="image") {
   const idByType = {
     image: "status",
     video: "videoStatus",
+    videoTranslate: "videoTranslateStatus",
     text: "textStatus",
     copilot: "copilotStatus",
     summarize: "summarizeStatus",
@@ -300,6 +301,7 @@ async function generateCopilot() {
 async function loadTranslateLanguages() {
   const sourceSel = document.getElementById("translateSourceLang");
   const targetSel = document.getElementById("translateTargetLang");
+  const videoTargetSel = document.getElementById("videoTranslateTarget");
   if (!sourceSel || !targetSel) return;
 
   const res = await fetch("/api/translate-languages");
@@ -308,6 +310,13 @@ async function loadTranslateLanguages() {
     const detail = data && data.detail ? data.detail : res.statusText;
     setStatus(`Could not load languages: ${detail}`, "translate");
     targetSel.innerHTML = "";
+    if (videoTargetSel) {
+      videoTargetSel.innerHTML = "";
+      const opt = document.createElement("option");
+      opt.value = "";
+      opt.textContent = "Failed to load — check AWS credentials / region";
+      videoTargetSel.appendChild(opt);
+    }
     const opt = document.createElement("option");
     opt.value = "";
     opt.textContent = "Failed to load — check AWS credentials / region";
@@ -352,7 +361,91 @@ async function loadTranslateLanguages() {
     if (prefer) targetSel.value = prefer.value;
   }
 
+  if (videoTargetSel) {
+    const savedVideo = videoTargetSel.value;
+    videoTargetSel.innerHTML = "";
+    for (const l of langs) {
+      const o = document.createElement("option");
+      // Send label so backend resolver can handle "Name (code)" too.
+      o.value = l.name ? `${l.name} (${l.code})` : l.code;
+      o.textContent = l.name ? `${l.name} (${l.code})` : l.code;
+      videoTargetSel.appendChild(o);
+    }
+    if ([...videoTargetSel.options].some((o) => o.value === savedVideo)) {
+      videoTargetSel.value = savedVideo;
+    } else if (videoTargetSel.options.length) {
+      const prefer = [...videoTargetSel.options].find((o) => o.textContent.includes("(es)"))
+        || [...videoTargetSel.options].find((o) => o.textContent.includes("(fr)"))
+        || videoTargetSel.options[0];
+      if (prefer) videoTargetSel.value = prefer.value;
+    }
+  }
+
   setStatus("", "translate");
+}
+
+function setVideoTranslated(data) {
+  const vid = document.getElementById("videoTranslateResult");
+  if (!vid) return;
+  if (!data || !data.video_base64) {
+    vid.removeAttribute("src");
+    vid.style.display = "none";
+    return;
+  }
+  vid.src = `data:${data.mime_type};base64,${data.video_base64}`;
+  vid.style.display = "block";
+}
+
+async function translateVideoAudio() {
+  const input = document.getElementById("videoTranslateInput");
+  const targetSel = document.getElementById("videoTranslateTarget");
+  const keepOriginal = document.getElementById("videoKeepOriginalAudio");
+
+  const file = input && input.files && input.files[0] ? input.files[0] : null;
+  if (!file) {
+    setStatus("Please choose a video file.", "videoTranslate");
+    return;
+  }
+
+  const target_language = targetSel ? targetSel.value : "";
+  if (!target_language) {
+    setStatus("Choose a target language.", "videoTranslate");
+    return;
+  }
+
+  setStatus("Translating video audio… (this can take a bit)", "videoTranslate");
+  setVideoTranslated(null);
+
+  let video_base64;
+  try {
+    const dataUrl = await readFileAsDataUrl(file);
+    const idx = dataUrl.indexOf(",");
+    video_base64 = idx >= 0 ? dataUrl.slice(idx + 1) : dataUrl;
+  } catch (err) {
+    setStatus(`Failed to read video file: ${err.message || err}`, "videoTranslate");
+    return;
+  }
+
+  const res = await fetch("/api/translate-video-audio", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      video_base64,
+      mime_type: file.type || "video/mp4",
+      target_language,
+      keep_original_audio: keepOriginal ? !!keepOriginal.checked : true,
+    }),
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const detail = data && data.detail ? data.detail : res.statusText;
+    setStatus(`Error: ${detail}`, "videoTranslate");
+    return;
+  }
+
+  setStatus("Done.", "videoTranslate");
+  setVideoTranslated(data);
 }
 
 async function translatePost() {
@@ -510,7 +603,18 @@ async function main() {
     clearVideoBtn.addEventListener("click", () => {
       document.getElementById("videoPrompt").value = "";
       setVideo(null);
+      setVideoTranslated(null);
       setStatus("", "video");
+      setStatus("", "videoTranslate");
+    });
+  }
+
+  const translateVideoAudioBtn = document.getElementById("translateVideoAudioBtn");
+  if (translateVideoAudioBtn) {
+    translateVideoAudioBtn.addEventListener("click", () => {
+      translateVideoAudio().catch((err) =>
+        setStatus(`Error: ${err.message || err}`, "videoTranslate")
+      );
     });
   }
 

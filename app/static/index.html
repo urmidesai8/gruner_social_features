@@ -406,6 +406,35 @@
           <span class="loader" id="videoLoader" style="display: none;"></span>
           <video id="videoResult" controls style="display: none; max-width: 100%; height: auto; border-radius: 12px;"></video>
         </div>
+
+        <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 1.5rem 0;" />
+
+        <div class="input-group">
+          <label for="videoTranslateInput">Upload video for audio translation</label>
+          <input id="videoTranslateInput" type="file" accept="video/*" />
+        </div>
+
+        <div class="input-group">
+          <label for="videoTranslateTarget">Target language (Transcribe + Translate + Polly)</label>
+          <select id="videoTranslateTarget"></select>
+        </div>
+
+        <div class="input-group" style="display: flex; align-items: center; gap: 0.5rem;">
+          <input id="videoKeepOriginalAudio" type="checkbox" checked />
+          <label for="videoKeepOriginalAudio" style="margin: 0;">Keep original audio as extra track</label>
+        </div>
+
+        <div class="actions">
+          <button id="translateVideoAudioBtn" class="primary-btn" type="button">Translate Video Audio</button>
+        </div>
+
+        <div class="status-container">
+          <div id="videoTranslateStatus"></div>
+        </div>
+
+        <div class="image-container" id="videoTranslateContainer">
+          <video id="videoTranslateResult" controls style="display: none; max-width: 100%; height: auto; border-radius: 12px;"></video>
+        </div>
       </div>
 
       <!-- Text Tab Content -->
@@ -541,7 +570,7 @@
 
     <!-- Ensure existing JS can find these IDs for the image generation specifically -->
     <!-- Cache-bust to ensure latest app.js is loaded in browser -->
-    <script src="/static/app.js?v=10"></script>
+    <script src="/static/app.js?v=12"></script>
     <script>
       // DOM Elements
       const tabImageBtn = document.getElementById('tabImage');
