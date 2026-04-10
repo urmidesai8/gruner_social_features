@@ -46,7 +46,7 @@ async def translate_video_audio(req: VideoAudioTranslateRequest) -> VideoAudioTr
         raise HTTPException(status_code=400, detail="Missing target_language.")
 
     try:
-        mime_type, video_base64 = await translate_video_audio_base64(
+        mime_type, video_base64, translated_text = await translate_video_audio_base64(
             req.video_base64,
             req.mime_type,
             req.target_language,
@@ -57,5 +57,9 @@ async def translate_video_audio(req: VideoAudioTranslateRequest) -> VideoAudioTr
     except RuntimeError as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
 
-    return VideoAudioTranslateResponse(mime_type=mime_type, video_base64=video_base64)
+    return VideoAudioTranslateResponse(
+        mime_type=mime_type,
+        video_base64=video_base64,
+        translated_text=translated_text,
+    )
 

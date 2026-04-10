@@ -386,6 +386,12 @@ async function loadTranslateLanguages() {
 
 function setVideoTranslated(data) {
   const vid = document.getElementById("videoTranslateResult");
+  const textArea = document.getElementById("videoTranslatedText");
+  const textGroup = document.getElementById("videoTranslatedTextGroup");
+
+  if (textArea) textArea.value = "";
+  if (textGroup) textGroup.style.display = "none";
+
   if (!vid) return;
   if (!data || !data.video_base64) {
     vid.removeAttribute("src");
@@ -394,6 +400,12 @@ function setVideoTranslated(data) {
   }
   vid.src = `data:${data.mime_type};base64,${data.video_base64}`;
   vid.style.display = "block";
+
+  const transcript = data.translated_text != null ? String(data.translated_text).trim() : "";
+  if (textArea && transcript) {
+    textArea.value = transcript;
+    if (textGroup) textGroup.style.display = "block";
+  }
 }
 
 async function translateVideoAudio() {

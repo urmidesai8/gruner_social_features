@@ -74,6 +74,10 @@ class VideoAudioTranslateRequest(BaseModel):
 class VideoAudioTranslateResponse(BaseModel):
     mime_type: str
     video_base64: str
+    translated_text: str = Field(
+        ...,
+        description="Full transcript of the translated speech (all segments joined with spaces).",
+    )
 
 
 class GenerateQuoteCardRequest(BaseModel):

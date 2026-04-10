@@ -312,7 +312,7 @@ def _translate_video_audio_sync(
     mime_type: str,
     target_language: str,
     keep_original_audio: bool,
-) -> Tuple[str, str]:
+) -> Tuple[str, str, str]:
     if not (video_base64 or "").strip():
         raise ValueError("video_base64 is required.")
     if not (mime_type or "").strip():
@@ -343,6 +343,7 @@ def _translate_video_audio_sync(
         # Translate + TTS per segment, then delay/mix according to timestamps.
         segment_paths: List[str] = []
         segment_delays_ms: List[int] = []
+        translated_segment_texts: List[str] = []
         for idx, seg in enumerate(segments):
             # Keep Polly requests reasonably sized.
             src_text = (seg.text or "").strip()
@@ -351,6 +352,7 @@ def _translate_video_audio_sync(
             if len(src_text) > 1500:
                 src_text = src_text[:1500]
             translated = _translate_text_sync_auto(src_text, target_language_code)
+            translated_segment_texts.append(translated)
             mp3_path = os.path.join(tmp, f"seg_{idx}.mp3")
             _polly_synthesize_segment_mp3(translated, mp3_path, target_language_code)
             segment_paths.append(mp3_path)
@@ -403,7 +405,8 @@ def _translate_video_audio_sync(
         with open(out_path, "rb") as f:
             out_b = f.read()
 
-    return "video/mp4", base64.b64encode(out_b).decode("ascii")
+    translated_text = " ".join(translated_segment_texts).strip()
+    return "video/mp4", base64.b64encode(out_b).decode("ascii"), translated_text
 
 
 async def translate_video_audio_base64(
@@ -411,7 +414,7 @@ async def translate_video_audio_base64(
     mime_type: str,
     target_language: str,
     keep_original_audio: bool = True,
-) -> Tuple[str, str]:
+) -> Tuple[str, str, str]:
     return await asyncio.to_thread(
         _translate_video_audio_sync,
         video_base64,

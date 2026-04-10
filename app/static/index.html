@@ -129,6 +129,8 @@
         display: flex;
         flex-direction: column;
         gap: 0.5rem;
+        width: 100%;
+        min-width: 0;
       }
 
       label {
@@ -149,6 +151,8 @@
         font-size: 1rem;
         transition: all 0.3s ease;
         outline: none;
+        width: 100%;
+        max-width: 100%;
       }
 
       select {
@@ -435,6 +439,16 @@
         <div class="image-container" id="videoTranslateContainer">
           <video id="videoTranslateResult" controls style="display: none; max-width: 100%; height: auto; border-radius: 12px;"></video>
         </div>
+
+        <div class="input-group" id="videoTranslatedTextGroup" style="display: none;">
+          <label for="videoTranslatedText">Translated text (from audio)</label>
+          <textarea
+            id="videoTranslatedText"
+            readonly
+            placeholder="After translation, the target-language transcript appears here."
+            rows="6"
+          ></textarea>
+        </div>
       </div>
 
       <!-- Text Tab Content -->
@@ -570,7 +584,7 @@
 
     <!-- Ensure existing JS can find these IDs for the image generation specifically -->
     <!-- Cache-bust to ensure latest app.js is loaded in browser -->
-    <script src="/static/app.js?v=12"></script>
+    <script src="/static/app.js?v=13"></script>
     <script>
       // DOM Elements
       const tabImageBtn = document.getElementById('tabImage');
