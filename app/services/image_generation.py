@@ -156,7 +156,11 @@ def _generate_aws_bedrock_image_sync(model_id: str, prompt: str) -> Tuple[str, s
             f"{model_id} only supports prompts up to {max_len} characters. Your prompt was {len(prompt)} characters."
         )
 
-    region_name = "us-east-1" if model_id == _NOVA_CANVAS_MODEL else "us-west-2"
+    region_name = (
+        os.getenv("AWS_REGION_BEDROCK_NOVA_CANVAS", "us-east-1")
+        if model_id == _NOVA_CANVAS_MODEL
+        else os.getenv("AWS_REGION_BEDROCK_IMAGE", "us-west-2")
+    )
 
     bedrock = bedrock_runtime_client(region_name=region_name)
 

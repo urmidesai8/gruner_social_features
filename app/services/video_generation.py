@@ -23,7 +23,7 @@ def _generate_nova_reel_video_sync(prompt: str) -> Tuple[str, str]:
 
     import botocore.exceptions
 
-    AWS_REGION = "us-east-1"
+    AWS_REGION = os.getenv("AWS_REGION_BEDROCK_NOVA_REEL", "us-east-1")
     SLEEP_SECONDS = 30
 
     bucket_uri = os.getenv("NOVA_REEL_BUCKET")
@@ -76,7 +76,7 @@ def _generate_nova_reel_video_sync(prompt: str) -> Tuple[str, str]:
 
     video_key = f"{key_prefix}/output.mp4"
 
-    s3 = s3_client()
+    s3 = s3_client(region_name=os.getenv("AWS_REGION_NOVA_REEL_S3", AWS_REGION))
     try:
         obj = s3.get_object(Bucket=bucket_name, Key=video_key)
     except botocore.exceptions.ClientError as e:
