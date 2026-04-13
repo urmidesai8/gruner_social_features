@@ -575,6 +575,51 @@
             rows="8"
           ></textarea>
         </div>
+
+        <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 1.5rem 0;" />
+
+        <div class="input-group">
+          <label for="voicePostAudioInput">Voice to Post / Comment (Upload audio)</label>
+          <input id="voicePostAudioInput" type="file" accept="audio/*" />
+        </div>
+
+        <div class="input-group">
+          <label for="voicePostOutputKind">Output type</label>
+          <select id="voicePostOutputKind">
+            <option value="post">Post</option>
+            <option value="comment">Comment</option>
+          </select>
+        </div>
+
+        <div class="actions">
+          <button id="voicePostBtn" class="primary-btn" type="button">Generate from Voice</button>
+          <button id="voiceLiveRecordBtn" class="secondary-btn" type="button">Start Live Recording</button>
+          <button id="clearVoicePostBtn" class="secondary-btn" type="button">Clear</button>
+        </div>
+
+        <div class="status-container">
+          <div id="voicePostStatus"></div>
+        </div>
+
+        <div class="input-group">
+          <label for="voicePostFinalOutput">Final post/comment</label>
+          <textarea
+            id="voicePostFinalOutput"
+            readonly
+            rows="6"
+            placeholder="Cleaned final text from Claude will appear here."
+          ></textarea>
+        </div>
+
+        <div class="input-group">
+          <label for="voicePostRawTranscript">Raw transcript</label>
+          <textarea
+            id="voicePostRawTranscript"
+            readonly
+            rows="5"
+            placeholder="Raw AWS Transcribe transcript will appear here."
+          ></textarea>
+        </div>
       </div>
 
       <div class="footer-text">
@@ -584,7 +629,7 @@
 
     <!-- Ensure existing JS can find these IDs for the image generation specifically -->
     <!-- Cache-bust to ensure latest app.js is loaded in browser -->
-    <script src="/static/app.js?v=13"></script>
+    <script src="/static/app.js?v=16"></script>
     <script>
       // DOM Elements
       const tabImageBtn = document.getElementById('tabImage');

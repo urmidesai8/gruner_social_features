@@ -67,6 +67,7 @@ function setStatus(text, type="image") {
     summarize: "summarizeStatus",
     caption: "captionStatus",
     translate: "translateStatus",
+    voicePost: "voicePostStatus",
   };
   const el = document.getElementById(idByType[type] || "status");
   if (el) el.textContent = text;
@@ -116,6 +117,48 @@ function readFileAsDataUrl(file) {
     reader.onerror = () => reject(new Error("Failed to read selected file."));
     reader.readAsDataURL(file);
   });
+}
+
+let voiceMediaRecorder = null;
+let voiceMediaStream = null;
+let voiceRecordedChunks = [];
+let voiceRecordingInProgress = false;
+
+function _stopVoiceStreamTracks() {
+  if (voiceMediaStream) {
+    for (const track of voiceMediaStream.getTracks()) {
+      track.stop();
+    }
+  }
+  voiceMediaStream = null;
+}
+
+async function _submitVoiceAudioBase64(audio_base64, mime_type, output_kind) {
+  const finalOutput = document.getElementById("voicePostFinalOutput");
+  const rawOutput = document.getElementById("voicePostRawTranscript");
+  if (finalOutput) finalOutput.value = "";
+  if (rawOutput) rawOutput.value = "";
+  setStatus("Transcribing and polishing from voice...", "voicePost");
+
+  const res = await fetch("/api/voice-to-post-comment", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      audio_base64,
+      mime_type,
+      output_kind,
+    }),
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const detail = data && data.detail ? data.detail : res.statusText;
+    throw new Error(detail);
+  }
+
+  if (finalOutput && data.final_text) finalOutput.value = data.final_text;
+  if (rawOutput && data.raw_transcript) rawOutput.value = data.raw_transcript;
+  setStatus("Done.", "voicePost");
 }
 
 async function generateVideo() {
@@ -539,6 +582,147 @@ async function summarizePost() {
   }
 }
 
+async function voiceToPostComment() {
+  const fileInput = document.getElementById("voicePostAudioInput");
+  const kindSel = document.getElementById("voicePostOutputKind");
+  const file = fileInput && fileInput.files ? fileInput.files[0] : null;
+
+  if (!file) {
+    setStatus("Please choose an audio file.", "voicePost");
+    return;
+  }
+
+  const output_kind = kindSel ? kindSel.value : "post";
+
+  let audio_base64 = "";
+  try {
+    const dataUrl = await readFileAsDataUrl(file);
+    const idx = dataUrl.indexOf(",");
+    audio_base64 = idx >= 0 ? dataUrl.slice(idx + 1) : dataUrl;
+  } catch (err) {
+    setStatus(`Failed to read audio file: ${err.message || err}`, "voicePost");
+    return;
+  }
+
+  try {
+    await _submitVoiceAudioBase64(audio_base64, file.type || "audio/webm", output_kind);
+  } catch (err) {
+    setStatus(`Error: ${err.message || err}`, "voicePost");
+  }
+}
+
+async function toggleLiveVoiceRecording() {
+  const liveBtn = document.getElementById("voiceLiveRecordBtn");
+  const uploadBtn = document.getElementById("voicePostBtn");
+  const fileInput = document.getElementById("voicePostAudioInput");
+  const kindSel = document.getElementById("voicePostOutputKind");
+  const output_kind = kindSel ? kindSel.value : "post";
+
+  if (!voiceRecordingInProgress) {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      setStatus("Live recording is not supported in this browser.", "voicePost");
+      return;
+    }
+    if (typeof MediaRecorder === "undefined") {
+      setStatus("MediaRecorder is not available in this browser.", "voicePost");
+      return;
+    }
+
+    try {
+      voiceMediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const preferredMimeType = "audio/webm;codecs=opus";
+      const fallbackMimeType = "audio/webm";
+      const mimeType = MediaRecorder.isTypeSupported(preferredMimeType)
+        ? preferredMimeType
+        : (MediaRecorder.isTypeSupported(fallbackMimeType) ? fallbackMimeType : "");
+      voiceMediaRecorder = mimeType
+        ? new MediaRecorder(voiceMediaStream, { mimeType })
+        : new MediaRecorder(voiceMediaStream);
+    } catch (err) {
+      _stopVoiceStreamTracks();
+      setStatus(`Microphone access failed: ${err.message || err}`, "voicePost");
+      return;
+    }
+
+    voiceRecordedChunks = [];
+    voiceMediaRecorder.ondataavailable = (evt) => {
+      if (evt.data && evt.data.size > 0) {
+        voiceRecordedChunks.push(evt.data);
+      }
+    };
+    voiceMediaRecorder.start(250);
+    voiceRecordingInProgress = true;
+    if (liveBtn) liveBtn.textContent = "Stop Live Recording";
+    if (uploadBtn) uploadBtn.disabled = true;
+    if (fileInput) fileInput.disabled = true;
+    setStatus("Recording live audio... click stop when done.", "voicePost");
+    return;
+  }
+
+  if (!voiceMediaRecorder) {
+    voiceRecordingInProgress = false;
+    if (liveBtn) liveBtn.textContent = "Start Live Recording";
+    if (uploadBtn) uploadBtn.disabled = false;
+    if (fileInput) fileInput.disabled = false;
+    setStatus("Live recorder is not initialized.", "voicePost");
+    return;
+  }
+
+  const recorder = voiceMediaRecorder;
+  const stopPromise = new Promise((resolve) => {
+    recorder.onstop = () => resolve();
+  });
+  recorder.stop();
+  await stopPromise;
+  voiceRecordingInProgress = false;
+  if (liveBtn) liveBtn.textContent = "Start Live Recording";
+  if (uploadBtn) uploadBtn.disabled = false;
+  if (fileInput) fileInput.disabled = false;
+  _stopVoiceStreamTracks();
+
+  const blob = new Blob(voiceRecordedChunks, {
+    type: recorder.mimeType || "audio/webm",
+  });
+  voiceRecordedChunks = [];
+  voiceMediaRecorder = null;
+  if (!blob.size) {
+    setStatus("No audio captured. Please try recording again.", "voicePost");
+    return;
+  }
+
+  try {
+    const dataUrl = await readFileAsDataUrl(blob);
+    const idx = dataUrl.indexOf(",");
+    const audio_base64 = idx >= 0 ? dataUrl.slice(idx + 1) : dataUrl;
+    const finalOutput = document.getElementById("voicePostFinalOutput");
+    const rawOutput = document.getElementById("voicePostRawTranscript");
+    if (finalOutput) finalOutput.value = "";
+    if (rawOutput) rawOutput.value = "";
+    setStatus("Transcribing and polishing from live voice...", "voicePost");
+
+    const res = await fetch("/api/voice-to-post-comment", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        audio_base64,
+        mime_type: blob.type || "audio/webm",
+        output_kind,
+        audio_source: "live_microphone",
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const detail = data && data.detail ? data.detail : res.statusText;
+      throw new Error(detail);
+    }
+    if (finalOutput && data.final_text) finalOutput.value = data.final_text;
+    if (rawOutput && data.raw_transcript) rawOutput.value = data.raw_transcript;
+    setStatus("Done.", "voicePost");
+  } catch (err) {
+    setStatus(`Error: ${err.message || err}`, "voicePost");
+  }
+}
+
 async function generate() {
   const model = document.getElementById("model").value;
   const prompt = document.getElementById("prompt").value.trim();
@@ -737,6 +921,49 @@ async function main() {
       if (input) input.value = "";
       if (output) output.value = "";
       setStatus("", "translate");
+    });
+  }
+
+  const voicePostBtn = document.getElementById("voicePostBtn");
+  if (voicePostBtn) {
+    voicePostBtn.addEventListener("click", () => {
+      voiceToPostComment().catch((err) =>
+        setStatus(`Error: ${err.message || err}`, "voicePost")
+      );
+    });
+  }
+
+  const clearVoicePostBtn = document.getElementById("clearVoicePostBtn");
+  if (clearVoicePostBtn) {
+    clearVoicePostBtn.addEventListener("click", () => {
+      if (voiceRecordingInProgress && voiceMediaRecorder) {
+        voiceMediaRecorder.stop();
+      }
+      voiceRecordingInProgress = false;
+      voiceMediaRecorder = null;
+      voiceRecordedChunks = [];
+      _stopVoiceStreamTracks();
+      const fileInput = document.getElementById("voicePostAudioInput");
+      const finalOutput = document.getElementById("voicePostFinalOutput");
+      const rawOutput = document.getElementById("voicePostRawTranscript");
+      const uploadBtn = document.getElementById("voicePostBtn");
+      const liveBtn = document.getElementById("voiceLiveRecordBtn");
+      if (fileInput) fileInput.value = "";
+      if (fileInput) fileInput.disabled = false;
+      if (finalOutput) finalOutput.value = "";
+      if (rawOutput) rawOutput.value = "";
+      if (uploadBtn) uploadBtn.disabled = false;
+      if (liveBtn) liveBtn.textContent = "Start Live Recording";
+      setStatus("", "voicePost");
+    });
+  }
+
+  const liveRecordBtn = document.getElementById("voiceLiveRecordBtn");
+  if (liveRecordBtn) {
+    liveRecordBtn.addEventListener("click", () => {
+      toggleLiveVoiceRecording().catch((err) =>
+        setStatus(`Error: ${err.message || err}`, "voicePost")
+      );
     });
   }
 }

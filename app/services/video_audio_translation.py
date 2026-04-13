@@ -19,8 +19,9 @@ from app.services.text_translation import _list_languages_sync, _resolve_target_
 _INDIAN_LANGUAGE_CODES = {"as", "bn", "gu", "hi", "kn", "ml", "mr", "or", "pa", "ta", "te"}
 
 _INDIAN_POLLY_VOICES_BY_LANGUAGE_CODE = {
-    # In current Polly setup, Hindi is reliably supported with Indian voices.
+    # Per-language Polly voices (see AWS Polly voice list for language support).
     "hi": "Aditi",
+    "ur": "Zeina",
 }
 
 
@@ -218,9 +219,12 @@ def _pick_polly_voice(target_language_code: str) -> str:
     if explicit:
         return explicit
     code = (target_language_code or "").strip().lower()
-    if code in _INDIAN_LANGUAGE_CODES and code != "hi":
+    voice = _INDIAN_POLLY_VOICES_BY_LANGUAGE_CODE.get(code)
+    if voice:
+        return voice
+    if code in _INDIAN_LANGUAGE_CODES:
         return "Joanna"
-    return _INDIAN_POLLY_VOICES_BY_LANGUAGE_CODE.get(code, "Joanna")
+    return "Joanna"
 
 
 def _polly_synthesize_segment_mp3(text: str, out_path: str, target_language_code: str) -> None:

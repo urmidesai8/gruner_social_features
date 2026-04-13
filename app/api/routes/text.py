@@ -7,6 +7,8 @@ from app.models.schemas import (
     GenerateQuoteCardResponse,
     SummarizePostRequest,
     SummarizePostResponse,
+    VoiceToPostCommentRequest,
+    VoiceToPostCommentResponse,
     TranslateLanguagesResponse,
     TranslateLanguageItem,
     TranslateTextRequest,
@@ -16,6 +18,7 @@ from app.services.content_copilot import generate_copilot_text
 from app.services.quote_card_generation import generate_quote_card_base64
 from app.services.summarize_post import summarize_post_text
 from app.services.text_translation import list_translate_languages, translate_post_text
+from app.services.voice_to_post_comment import voice_to_post_comment
 
 
 router = APIRouter(prefix="/api", tags=["text"])
@@ -73,6 +76,33 @@ async def summarize_post(req: SummarizePostRequest) -> SummarizePostResponse:
         raise HTTPException(status_code=500, detail=str(e)) from e
 
     return SummarizePostResponse(original_text=text, result=result)
+
+
+@router.post("/voice-to-post-comment", response_model=VoiceToPostCommentResponse)
+async def voice_post_comment(
+    req: VoiceToPostCommentRequest,
+) -> VoiceToPostCommentResponse:
+    if not (req.audio_base64 or "").strip():
+        raise HTTPException(status_code=400, detail="Missing audio_base64.")
+    if not (req.mime_type or "").strip():
+        raise HTTPException(status_code=400, detail="Missing mime_type.")
+    try:
+        out = await voice_to_post_comment(
+            audio_base64=req.audio_base64,
+            mime_type=req.mime_type,
+            output_kind=req.output_kind,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+    return VoiceToPostCommentResponse(
+        raw_transcript=out["raw_transcript"],
+        final_text=out["final_text"],
+        output_kind=out["output_kind"],  # type: ignore[arg-type]
+        language_code=out["language_code"],
+    )
 
 
 @router.get("/translate-languages", response_model=TranslateLanguagesResponse)

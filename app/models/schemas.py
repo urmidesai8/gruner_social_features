@@ -117,6 +117,24 @@ class SummarizePostResponse(BaseModel):
     result: str
 
 
+class VoiceToPostCommentRequest(BaseModel):
+    audio_base64: str = Field(..., description="Base64-encoded source audio.")
+    mime_type: str = Field(..., description="MIME type of the audio, for example audio/webm.")
+    output_kind: Literal["post", "comment"] = Field(
+        default="post",
+        description="Choose whether the cleaned output should be a post or a comment.",
+    )
+
+    
+
+
+class VoiceToPostCommentResponse(BaseModel):
+    raw_transcript: str
+    final_text: str
+    output_kind: Literal["post", "comment"]
+    language_code: str
+
+
 class TranslateLanguageItem(BaseModel):
     code: str
     name: str
