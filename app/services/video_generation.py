@@ -6,6 +6,7 @@ import os
 
 from dotenv import load_dotenv
 from huggingface_hub import InferenceClient
+from app.services.aws_clients import bedrock_runtime_client, s3_client
 
 load_dotenv()
 
@@ -17,17 +18,10 @@ _NOVA_REEL_MODEL = "amazon.nova-reel-v1:1"
 
 
 def _generate_nova_reel_video_sync(prompt: str) -> Tuple[str, str]:
-    import json
     import random
     import time
 
-    import boto3
     import botocore.exceptions
-
-    aws_access_key_id = os.getenv("AWS_ACCESS_KEY")
-    aws_secret_access_key = os.getenv("AWS_SECRET_KEY")
-    if not (aws_access_key_id and aws_secret_access_key):
-        raise RuntimeError("Missing AWS credentials in environment for Amazon Nova Reel model.")
 
     AWS_REGION = "us-east-1"
     SLEEP_SECONDS = 30
@@ -38,12 +32,7 @@ def _generate_nova_reel_video_sync(prompt: str) -> Tuple[str, str]:
     if not bucket_uri.startswith("s3://"):
         bucket_uri = f"s3://{bucket_uri}"
 
-    bedrock_runtime = boto3.client(
-        "bedrock-runtime",
-        region_name=AWS_REGION,
-        aws_access_key_id=aws_access_key_id,
-        aws_secret_access_key=aws_secret_access_key,
-    )
+    bedrock_runtime = bedrock_runtime_client(region_name=AWS_REGION)
 
     model_input = {
         "taskType": "MULTI_SHOT_AUTOMATED",
@@ -87,11 +76,7 @@ def _generate_nova_reel_video_sync(prompt: str) -> Tuple[str, str]:
 
     video_key = f"{key_prefix}/output.mp4"
 
-    s3 = boto3.client(
-        "s3",
-        aws_access_key_id=aws_access_key_id,
-        aws_secret_access_key=aws_secret_access_key,
-    )
+    s3 = s3_client()
     try:
         obj = s3.get_object(Bucket=bucket_name, Key=video_key)
     except botocore.exceptions.ClientError as e:

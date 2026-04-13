@@ -12,6 +12,7 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
+from app.services.aws_clients import bedrock_runtime_client
 from app.services.image_generation import generate_image_base64
 
 _QUOTE_CARD_MODEL = "stabilityai/stable-diffusion-xl-base-1.0"
@@ -131,7 +132,6 @@ def _overlay_quote_on_image_sync(image_b64: str, quote: str) -> Tuple[str, str]:
 
 
 def _generate_quote_text_sync(user_prompt: str) -> str:
-    import boto3
     import botocore.exceptions
 
     model_id = os.getenv("BEDROCK_CLAUDE_HAIKU_ID")
@@ -145,17 +145,7 @@ def _generate_quote_text_sync(user_prompt: str) -> str:
         len(user_prompt or ""),
     )
 
-    aws_access_key_id = os.getenv("AWS_ACCESS_KEY")
-    aws_secret_access_key = os.getenv("AWS_SECRET_KEY")
-    if not (aws_access_key_id and aws_secret_access_key):
-        raise RuntimeError("Missing AWS credentials in environment for Bedrock Claude Haiku.")
-
-    bedrock = boto3.client(
-        "bedrock-runtime",
-        region_name=os.getenv("AWS_REGION"),
-        aws_access_key_id=aws_access_key_id,
-        aws_secret_access_key=aws_secret_access_key,
-    )
+    bedrock = bedrock_runtime_client(region_name=os.getenv("AWS_REGION"))
 
     system_prompt = (
         "You write short inspirational quotes for visual quote cards. "

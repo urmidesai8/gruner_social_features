@@ -10,6 +10,7 @@ import os
 from typing import Any, Dict, List
 
 from dotenv import load_dotenv
+from app.services.aws_clients import translate_client
 
 load_dotenv()
 
@@ -18,22 +19,7 @@ _MAX_TEXT_BYTES = 10_000
 
 
 def _translate_client():
-    import boto3
-
-    aws_access_key_id = os.getenv("AWS_ACCESS_KEY")
-    aws_secret_access_key = os.getenv("AWS_SECRET_KEY")
-    if not (aws_access_key_id and aws_secret_access_key):
-        raise RuntimeError(
-            "Missing AWS credentials in environment (AWS_ACCESS_KEY, AWS_SECRET_KEY) for Amazon Translate."
-        )
-
-    region = os.getenv("AWS_REGION", "us-east-1")
-    return boto3.client(
-        "translate",
-        region_name=region,
-        aws_access_key_id=aws_access_key_id,
-        aws_secret_access_key=aws_secret_access_key,
-    )
+    return translate_client(region_name=os.getenv("AWS_REGION", "us-east-1"))
 
 
 def _list_languages_sync() -> List[Dict[str, str]]:

@@ -11,9 +11,9 @@ import uuid
 from dataclasses import dataclass
 from typing import List, Tuple
 
-import boto3
 import botocore.exceptions
 
+from app.services.aws_clients import polly_client, s3_client, transcribe_client
 from app.services.text_translation import _list_languages_sync, _resolve_target_language_code, _translate_client
 
 _INDIAN_LANGUAGE_CODES = {"as", "bn", "gu", "hi", "kn", "ml", "mr", "or", "pa", "ta", "te"}
@@ -39,28 +39,16 @@ def _require_env(name: str) -> str:
     return v
 
 
-def _aws_creds() -> tuple[str, str, str]:
-    ak = os.getenv("AWS_ACCESS_KEY")
-    sk = os.getenv("AWS_SECRET_KEY")
-    region = os.getenv("AWS_REGION", "us-east-1")
-    if not (ak and sk):
-        raise RuntimeError("Missing AWS credentials in environment (AWS_ACCESS_KEY/AWS_SECRET_KEY).")
-    return ak, sk, region
-
-
 def _s3_client():
-    ak, sk, region = _aws_creds()
-    return boto3.client("s3", aws_access_key_id=ak, aws_secret_access_key=sk, region_name=region)
+    return s3_client(region_name=os.getenv("AWS_REGION", "us-east-1"))
 
 
 def _transcribe_client():
-    ak, sk, region = _aws_creds()
-    return boto3.client("transcribe", aws_access_key_id=ak, aws_secret_access_key=sk, region_name=region)
+    return transcribe_client(region_name=os.getenv("AWS_REGION", "us-east-1"))
 
 
 def _polly_client():
-    ak, sk, region = _aws_creds()
-    return boto3.client("polly", aws_access_key_id=ak, aws_secret_access_key=sk, region_name=region)
+    return polly_client(region_name=os.getenv("AWS_REGION", "us-east-1"))
 
 
 def _run(cmd: List[str]) -> None:

@@ -11,6 +11,7 @@ from huggingface_hub.errors import HfHubHTTPError, RemoteEntryNotFoundError
 from PIL import Image
 import torch
 from dotenv import load_dotenv
+from app.services.aws_clients import bedrock_runtime_client
 
 load_dotenv()
 
@@ -146,7 +147,6 @@ def _generate_kandinsky_sync(pipe: DiffusionPipeline, prompt: str) -> Image.Imag
 
 
 def _generate_aws_bedrock_image_sync(model_id: str, prompt: str) -> Tuple[str, str]:
-    import boto3
     import botocore.exceptions
     import json
 
@@ -156,19 +156,9 @@ def _generate_aws_bedrock_image_sync(model_id: str, prompt: str) -> Tuple[str, s
             f"{model_id} only supports prompts up to {max_len} characters. Your prompt was {len(prompt)} characters."
         )
 
-    aws_access_key_id = os.getenv("AWS_ACCESS_KEY")
-    aws_secret_access_key = os.getenv("AWS_SECRET_KEY")
-    if not (aws_access_key_id and aws_secret_access_key):
-        raise RuntimeError("Missing AWS credentials in environment for Amazon Bedrock models.")
-
     region_name = "us-east-1" if model_id == _NOVA_CANVAS_MODEL else "us-west-2"
 
-    bedrock = boto3.client(
-        "bedrock-runtime",
-        region_name=region_name,
-        aws_access_key_id=aws_access_key_id,
-        aws_secret_access_key=aws_secret_access_key,
-    )
+    bedrock = bedrock_runtime_client(region_name=region_name)
 
     body = {
         "taskType": "TEXT_IMAGE",

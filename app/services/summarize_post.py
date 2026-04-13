@@ -3,6 +3,8 @@ import logging
 import os
 import time
 
+from app.services.aws_clients import bedrock_runtime_client
+
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -11,24 +13,13 @@ async def summarize_post_text(text: str) -> str:
     """
     Turn a long post into a short, easy-to-read summary (bullets) using Claude Haiku.
     """
-    import boto3
     import botocore.exceptions
 
     model_id = os.getenv("BEDROCK_CLAUDE_HAIKU_ID")
     if not model_id:
         raise RuntimeError("Missing BEDROCK_CLAUDE_HAIKU_ID in environment.")
 
-    aws_access_key_id = os.getenv("AWS_ACCESS_KEY")
-    aws_secret_access_key = os.getenv("AWS_SECRET_KEY")
-    if not (aws_access_key_id and aws_secret_access_key):
-        raise RuntimeError("Missing AWS credentials in environment for Bedrock Claude Haiku.")
-
-    bedrock = boto3.client(
-        "bedrock-runtime",
-        region_name=os.getenv("AWS_REGION"),
-        aws_access_key_id=aws_access_key_id,
-        aws_secret_access_key=aws_secret_access_key,
-    )
+    bedrock = bedrock_runtime_client(region_name=os.getenv("AWS_REGION"))
 
     system_prompt = (
         "You help busy readers understand long social posts and articles. "

@@ -10,6 +10,7 @@ import time
 import torch
 from dotenv import load_dotenv
 from PIL import Image
+from app.services.aws_clients import bedrock_runtime_client
 
 load_dotenv()
 
@@ -134,24 +135,13 @@ def _generate_caption_variants_sync(blip_caption: str) -> Dict[str, str]:
     """
     Use Bedrock Claude Haiku to rewrite the BLIP caption into 5 styles.
     """
-    import boto3
     import botocore.exceptions
 
     model_id = os.getenv("BEDROCK_CLAUDE_HAIKU_ID")
     if not model_id:
         raise RuntimeError("Missing BEDROCK_CLAUDE_HAIKU_ID in environment.")
 
-    aws_access_key_id = os.getenv("AWS_ACCESS_KEY")
-    aws_secret_access_key = os.getenv("AWS_SECRET_KEY")
-    if not (aws_access_key_id and aws_secret_access_key):
-        raise RuntimeError("Missing AWS credentials in environment for Bedrock Claude Haiku.")
-
-    bedrock = boto3.client(
-        "bedrock-runtime",
-        region_name=os.getenv("AWS_REGION"),
-        aws_access_key_id=aws_access_key_id,
-        aws_secret_access_key=aws_secret_access_key,
-    )
+    bedrock = bedrock_runtime_client(region_name=os.getenv("AWS_REGION"))
 
     system_prompt = (
         "You are an AI social media editor. "

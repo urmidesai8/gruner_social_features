@@ -7,52 +7,24 @@ import time
 import uuid
 from typing import Literal
 
-import boto3
 import botocore.exceptions
+
+from app.services.aws_clients import bedrock_runtime_client, s3_client, transcribe_client
 
 
 _OutputKind = Literal["post", "comment"]
 
 
-def _aws_creds() -> tuple[str, str, str]:
-    access_key = os.getenv("AWS_ACCESS_KEY")
-    secret_key = os.getenv("AWS_SECRET_KEY")
-    region = os.getenv("AWS_REGION", "us-east-1")
-    if not (access_key and secret_key):
-        raise RuntimeError(
-            "Missing AWS credentials in environment (AWS_ACCESS_KEY/AWS_SECRET_KEY)."
-        )
-    return access_key, secret_key, region
-
-
 def _s3_client():
-    access_key, secret_key, region = _aws_creds()
-    return boto3.client(
-        "s3",
-        aws_access_key_id=access_key,
-        aws_secret_access_key=secret_key,
-        region_name=region,
-    )
+    return s3_client(region_name=os.getenv("AWS_REGION", "us-east-1"))
 
 
 def _transcribe_client():
-    access_key, secret_key, region = _aws_creds()
-    return boto3.client(
-        "transcribe",
-        aws_access_key_id=access_key,
-        aws_secret_access_key=secret_key,
-        region_name=region,
-    )
+    return transcribe_client(region_name=os.getenv("AWS_REGION", "us-east-1"))
 
 
 def _bedrock_client():
-    access_key, secret_key, region = _aws_creds()
-    return boto3.client(
-        "bedrock-runtime",
-        aws_access_key_id=access_key,
-        aws_secret_access_key=secret_key,
-        region_name=region,
-    )
+    return bedrock_runtime_client(region_name=os.getenv("AWS_REGION", "us-east-1"))
 
 
 def _normalize_audio_base64(audio_base64: str) -> bytes:
