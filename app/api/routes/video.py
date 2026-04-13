@@ -12,7 +12,7 @@ from app.services.video_audio_translation import translate_video_audio_base64
 from app.services.video_generation import VIDEO_MODELS, generate_video_base64
 
 
-router = APIRouter(prefix="/api", tags=["video"])
+router = APIRouter(prefix="/api", tags=["Video Related Features"])
 
 
 @router.get("/video-models")

@@ -18,7 +18,7 @@ from app.services.image_captioning import generate_image_caption_options
 from app.api.deps import extract_prompt
 
 
-router = APIRouter(prefix="/api", tags=["image"])
+router = APIRouter(prefix="/api", tags=["Image Related Features"])
 
 
 @router.get("/models")

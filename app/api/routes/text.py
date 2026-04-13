@@ -21,7 +21,7 @@ from app.services.text_translation import list_translate_languages, translate_po
 from app.services.voice_to_post_comment import voice_to_post_comment
 
 
-router = APIRouter(prefix="/api", tags=["text"])
+router = APIRouter(prefix="/api", tags=["Text Related Features"])
 
 
 @router.post("/generate-quote-card", response_model=GenerateQuoteCardResponse)
