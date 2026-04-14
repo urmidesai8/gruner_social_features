@@ -31,6 +31,7 @@ Required by one or more endpoints:
 - `OPENAI_KEY` - required for OpenAI image model (`gpt-image-1.5`)
 - `NOVA_REEL_BUCKET` - S3 URI or bucket name for Nova Reel async output
 - `TRANSCRIBE_BUCKET` - S3 bucket used by video-audio translation transcription jobs
+- `BEDROCK_CLAUDE_SONNET_ID` - Bedrock Claude Sonnet model id used by voice-to-post/comment cleanup
 
 Optional:
 - `TRANSCRIBE_LANGUAGE_CODE` (default: `en-US`)
@@ -39,6 +40,10 @@ Optional:
 - `POLLY_ENGINE` (default: `neural`, auto-fallback to `standard` for unsupported voices)
 - `POLLY_TRACK_VOLUME_GAIN` (default: `2.4`)
 - `QUOTE_CARD_FONT_PATH` (custom font path for quote rendering)
+- `AWS_REGION_BEDROCK_IMAGE` (default: `us-west-2`)
+- `AWS_REGION_BEDROCK_NOVA_CANVAS` (default: `us-east-1`)
+- `AWS_REGION_BEDROCK_NOVA_REEL` (default: `us-east-1`)
+- `AWS_REGION_NOVA_REEL_S3` (default: `us-east-1`)
 
 ## Error Format
 Most failures return FastAPI `HTTPException` with:
@@ -386,3 +391,40 @@ Field details:
 - `source_language_code`: ISO code or `auto`.
 - `target_language`: code/name/label format accepted.
 - Input text is validated against AWS Translate payload limits.
+
+---
+
+### 6) Voice to Post/Comment
+**Endpoint:** `POST /api/voice-to-post-comment`
+
+Pipeline:
+1. Accept Base64 encoded audio input
+2. Upload source audio to S3 (`TRANSCRIBE_BUCKET`)
+3. Run AWS Transcribe (auto language identification by default)
+4. Clean and format transcript with Claude Sonnet
+5. Return both raw transcript and polished social text
+
+**Request Body**
+```json
+{
+  "audio_base64": "GkXfowEAAAA...",
+  "mime_type": "audio/webm",
+  "output_kind": "comment",
+  "audio_source": "live_microphone"
+}
+```
+
+**Response Body**
+```json
+{
+  "raw_transcript": "i really loved this post",
+  "final_text": "I really loved this post. Thanks for sharing it!",
+  "output_kind": "comment",
+  "language_code": "auto"
+}
+```
+
+Field details:
+- `output_kind`: `post` or `comment` (defaults to `post`).
+- `audio_source`: optional hint for logging/debugging (`live_microphone` or `file_upload`).
+- `language_code` in response is `auto` when input language is auto-detected.
