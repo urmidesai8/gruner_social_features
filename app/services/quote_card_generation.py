@@ -13,7 +13,7 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
 from app.core.config import settings
-from app.services.aws_clients import bedrock_runtime_client
+from app.services.aws_clients import bedrock_invoke_model, bedrock_runtime_client
 from app.services.image_generation import generate_image_base64
 
 _QUOTE_CARD_MODEL = "stabilityai/stable-diffusion-xl-base-1.0"
@@ -162,7 +162,8 @@ def _generate_quote_text_sync(user_prompt: str) -> str:
     }
 
     try:
-        response = bedrock.invoke_model(
+        response = bedrock_invoke_model(
+            bedrock,
             modelId=model_id,
             body=json.dumps(body),
             accept="application/json",

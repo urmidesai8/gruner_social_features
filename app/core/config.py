@@ -24,6 +24,9 @@ class Settings(BaseSettings):
 
     bedrock_claude_haiku_id: Optional[str] = None
     bedrock_claude_sonnet_id: Optional[str] = None
+    bedrock_guardrail_id: Optional[str] = None
+    bedrock_guardrail_version: Optional[str] = None
+    bedrock_guardrail_trace: Optional[str] = None
 
     blip_model_id: str = "Salesforce/blip-image-captioning-large"
     blip_conditioning_text: str = "A photo of"

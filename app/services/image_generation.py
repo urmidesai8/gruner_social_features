@@ -12,7 +12,7 @@ from PIL import Image
 import torch
 from dotenv import load_dotenv
 from app.core.config import settings
-from app.services.aws_clients import bedrock_runtime_client
+from app.services.aws_clients import bedrock_invoke_model, bedrock_runtime_client
 
 load_dotenv()
 
@@ -178,7 +178,8 @@ def _generate_aws_bedrock_image_sync(model_id: str, prompt: str) -> Tuple[str, s
     }
 
     try:
-        response = bedrock.invoke_model(
+        response = bedrock_invoke_model(
+            bedrock,
             modelId=model_id,
             body=json.dumps(body),
             accept="application/json",

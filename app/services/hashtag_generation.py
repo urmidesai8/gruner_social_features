@@ -12,7 +12,12 @@ import uuid
 import botocore.exceptions
 
 from app.core.config import settings
-from app.services.aws_clients import bedrock_runtime_client, s3_client, transcribe_client
+from app.services.aws_clients import (
+    bedrock_invoke_model,
+    bedrock_runtime_client,
+    s3_client,
+    transcribe_client,
+)
 from app.services.image_captioning import generate_blip_caption
 
 
@@ -175,7 +180,8 @@ def _hashtags_with_sonnet_sync(combined_caption: str) -> list[str]:
     }
 
     try:
-        response = bedrock.invoke_model(
+        response = bedrock_invoke_model(
+            bedrock,
             modelId=model_id,
             body=json.dumps(body),
             accept="application/json",

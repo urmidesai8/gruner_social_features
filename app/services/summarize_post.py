@@ -3,7 +3,7 @@ import logging
 import time
 
 from app.core.config import settings
-from app.services.aws_clients import bedrock_runtime_client
+from app.services.aws_clients import bedrock_invoke_model, bedrock_runtime_client
 
 
 logger = logging.getLogger("uvicorn.error")
@@ -43,7 +43,8 @@ async def summarize_post_text(text: str) -> str:
     logger.info("summarize-post: step=llm start text_len=%d", len(text or ""))
 
     try:
-        response = bedrock.invoke_model(
+        response = bedrock_invoke_model(
+            bedrock,
             modelId=model_id,
             body=json.dumps(body),
             accept="application/json",

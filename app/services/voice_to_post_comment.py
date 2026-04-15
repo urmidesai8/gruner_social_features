@@ -9,7 +9,12 @@ from typing import Literal
 import botocore.exceptions
 
 from app.core.config import settings
-from app.services.aws_clients import bedrock_runtime_client, s3_client, transcribe_client
+from app.services.aws_clients import (
+    bedrock_invoke_model,
+    bedrock_runtime_client,
+    s3_client,
+    transcribe_client,
+)
 
 
 _OutputKind = Literal["post", "comment"]
@@ -186,7 +191,8 @@ def _cleanup_with_claude_sync(raw_transcript: str, output_kind: _OutputKind) -> 
 
     bedrock = _bedrock_client()
     try:
-        response = bedrock.invoke_model(
+        response = bedrock_invoke_model(
+            bedrock,
             modelId=model_id,
             body=json.dumps(body),
             accept="application/json",

@@ -3,7 +3,7 @@ import logging
 import time
 
 from app.core.config import settings
-from app.services.aws_clients import bedrock_runtime_client
+from app.services.aws_clients import bedrock_invoke_model, bedrock_runtime_client
 
 
 logger = logging.getLogger("uvicorn.error")
@@ -59,7 +59,8 @@ async def generate_copilot_text(mode: str, text: str) -> str:
     logger.info("copilot: step=llm start mode=%s text_len=%d", mode, len(text or ""))
 
     try:
-        response = bedrock.invoke_model(
+        response = bedrock_invoke_model(
+            bedrock,
             modelId=model_id,
             body=json.dumps(body),
             accept="application/json",

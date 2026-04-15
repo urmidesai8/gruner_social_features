@@ -45,3 +45,20 @@ def translate_client(region_name: str | None = None):
 def bedrock_runtime_client(region_name: str | None = None):
     return aws_client("bedrock-runtime", region_name=region_name)
 
+
+def bedrock_invoke_model(client, **kwargs):
+    """
+    Invoke Bedrock model with optional Guardrail configuration from settings.
+    """
+    guardrail_id = (settings.bedrock_guardrail_id or "").strip()
+    guardrail_version = (settings.bedrock_guardrail_version or "").strip()
+    guardrail_trace = (settings.bedrock_guardrail_trace or "").strip()
+
+    if guardrail_id:
+        kwargs["guardrailIdentifier"] = guardrail_id
+        kwargs["guardrailVersion"] = guardrail_version or "DRAFT"
+        if guardrail_trace:
+            kwargs["trace"] = guardrail_trace
+
+    return client.invoke_model(**kwargs)
+

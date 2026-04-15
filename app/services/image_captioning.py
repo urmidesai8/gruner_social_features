@@ -11,7 +11,7 @@ import torch
 from dotenv import load_dotenv
 from PIL import Image
 from app.core.config import settings
-from app.services.aws_clients import bedrock_runtime_client
+from app.services.aws_clients import bedrock_invoke_model, bedrock_runtime_client
 
 load_dotenv()
 
@@ -175,7 +175,8 @@ def _generate_caption_variants_sync(blip_caption: str) -> Dict[str, str]:
         "image-captioning: step=llm start blip_len=%d", len(blip_caption or "")
     )
     try:
-        response = bedrock.invoke_model(
+        response = bedrock_invoke_model(
+            bedrock,
             modelId=model_id,
             body=json.dumps(body),
             accept="application/json",
