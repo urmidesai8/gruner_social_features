@@ -620,6 +620,96 @@
             placeholder="Raw AWS Transcribe transcript will appear here."
           ></textarea>
         </div>
+
+        <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 1.5rem 0;" />
+
+        <div class="input-group">
+          <label for="hashtagTextCaption">Hashtag Generation - Text Caption (required)</label>
+          <textarea
+            id="hashtagTextCaption"
+            rows="4"
+            placeholder="Write your post caption (required)."
+          ></textarea>
+        </div>
+
+        <div class="input-group">
+          <label for="hashtagImageInput">Optional image upload (media_image)</label>
+          <input id="hashtagImageInput" type="file" accept="image/*" />
+        </div>
+
+        <div class="input-group">
+          <label for="hashtagVideoInput">Optional video upload (media_video)</label>
+          <input id="hashtagVideoInput" type="file" accept="video/*" />
+        </div>
+
+        <div class="actions">
+          <button id="generateHashtagBtn" class="primary-btn" type="button">Generate Hashtags</button>
+          <button id="clearHashtagBtn" class="secondary-btn" type="button">Clear</button>
+        </div>
+
+        <div class="status-container">
+          <div id="hashtagStatus"></div>
+        </div>
+
+        <div class="input-group">
+          <label for="hashtagHashtagsOutput">hashtags</label>
+          <textarea
+            id="hashtagHashtagsOutput"
+            readonly
+            rows="4"
+            placeholder="Generated hashtags will appear here."
+          ></textarea>
+        </div>
+
+        <div class="input-group">
+          <label for="hashtagCombinedCaptionOutput">combined_caption</label>
+          <textarea
+            id="hashtagCombinedCaptionOutput"
+            readonly
+            rows="6"
+            placeholder="Combined caption used for hashtag generation."
+          ></textarea>
+        </div>
+
+        <div class="input-group">
+          <label for="hashtagUsedSourcesOutput">used_sources</label>
+          <textarea
+            id="hashtagUsedSourcesOutput"
+            readonly
+            rows="3"
+            placeholder="Sources used for generation."
+          ></textarea>
+        </div>
+
+        <div class="input-group">
+          <label for="hashtagTextCaptionOutput">text_caption</label>
+          <textarea
+            id="hashtagTextCaptionOutput"
+            readonly
+            rows="4"
+            placeholder="Echoed text caption."
+          ></textarea>
+        </div>
+
+        <div class="input-group">
+          <label for="hashtagImageCaptionOutput">image_caption</label>
+          <textarea
+            id="hashtagImageCaptionOutput"
+            readonly
+            rows="4"
+            placeholder="Caption generated from uploaded image."
+          ></textarea>
+        </div>
+
+        <div class="input-group">
+          <label for="hashtagVideoCaptionOutput">video_caption</label>
+          <textarea
+            id="hashtagVideoCaptionOutput"
+            readonly
+            rows="4"
+            placeholder="Transcribed caption generated from uploaded video audio."
+          ></textarea>
+        </div>
       </div>
 
       <div class="footer-text">
@@ -629,7 +719,7 @@
 
     <!-- Ensure existing JS can find these IDs for the image generation specifically -->
     <!-- Cache-bust to ensure latest app.js is loaded in browser -->
-    <script src="/static/app.js?v=16"></script>
+    <script src="/static/app.js?v=17"></script>
     <script>
       // DOM Elements
       const tabImageBtn = document.getElementById('tabImage');

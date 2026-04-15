@@ -165,6 +165,27 @@ class TranslateTextResponse(BaseModel):
     target_language_code: str
 
 
+class HashtagGenerationRequest(BaseModel):
+    text_caption: str = Field(..., description="Primary user-provided post caption text.")
+    media_image: Optional[str] = Field(
+        default=None,
+        description="Optional base64-encoded image content for image-caption-assisted hashtags.",
+    )
+    media_video: Optional[str] = Field(
+        default=None,
+        description="Optional base64-encoded video content for audio-transcript-assisted hashtags.",
+    )
+
+
+class HashtagGenerationResponse(BaseModel):
+    hashtags: List[str]
+    combined_caption: str
+    used_sources: List[str]
+    text_caption: str
+    image_caption: Optional[str] = None
+    video_caption: Optional[str] = None
+
+
 class ImageCaptioningRequest(BaseModel):
     image_base64: str
     mime_type: Optional[str] = None

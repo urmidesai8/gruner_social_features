@@ -10,15 +10,16 @@ import time
 import torch
 from dotenv import load_dotenv
 from PIL import Image
+from app.core.config import settings
 from app.services.aws_clients import bedrock_runtime_client
 
 load_dotenv()
 
 logger = logging.getLogger("uvicorn.error")
 
-_BLIP_MODEL_ID = "Salesforce/blip-image-captioning-large"
-# ImageTextToTextPipeline requires non-None `text` when `images` is set; BLIP is trained with a short prefix.
-_BLIP_CONDITIONING_TEXT = "A photo of"
+_BLIP_MODEL_ID = settings.blip_model_id
+_BLIP_CONDITIONING_TEXT = settings.blip_conditioning_text
+
 
 _blip_pipe = None
 _blip_load_lock = asyncio.Lock()
@@ -57,7 +58,7 @@ async def _get_blip_pipeline():
             # MPS support varies by transformers build; default to CPU.
             device = -1
 
-        hf_token = os.getenv("HF_TOKEN")
+        hf_token = settings.hf_token
         # Transformers 5.x removes the "image-to-text" task; use "image-text-to-text" for BLIP captioning.
         _blip_pipe = pipeline(
             "image-text-to-text",
@@ -137,11 +138,11 @@ def _generate_caption_variants_sync(blip_caption: str) -> Dict[str, str]:
     """
     import botocore.exceptions
 
-    model_id = os.getenv("BEDROCK_CLAUDE_HAIKU_ID")
+    model_id = settings.bedrock_claude_haiku_id
     if not model_id:
         raise RuntimeError("Missing BEDROCK_CLAUDE_HAIKU_ID in environment.")
 
-    bedrock = bedrock_runtime_client(region_name=os.getenv("AWS_REGION"))
+    bedrock = bedrock_runtime_client(region_name=settings.aws_region)
 
     system_prompt = (
         "You are an AI social media editor. "
@@ -222,7 +223,24 @@ async def generate_image_caption_options(
     return blip_caption, variants
 
 
+async def generate_blip_caption(image_base64: str) -> str:
+    """
+    Generate only the raw BLIP caption for an input image.
+    """
+    image = _decode_base64_image(image_base64)
+    pipe = await _get_blip_pipeline()
+    global _blip_pipe
+    _blip_pipe = pipe
+
+    blip_caption = await asyncio.to_thread(_generate_blip_caption_sync, image)
+    blip_caption = (blip_caption or "").strip()
+    if not blip_caption:
+        raise RuntimeError("BLIP returned an empty caption.")
+    return blip_caption
+
+
 __all__ = [
+    "generate_blip_caption",
     "generate_image_caption_options",
 ]
 

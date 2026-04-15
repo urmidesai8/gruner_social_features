@@ -11,6 +11,7 @@ from huggingface_hub.errors import HfHubHTTPError, RemoteEntryNotFoundError
 from PIL import Image
 import torch
 from dotenv import load_dotenv
+from app.core.config import settings
 from app.services.aws_clients import bedrock_runtime_client
 
 load_dotenv()
@@ -42,7 +43,7 @@ _kandinsky_generate_lock = asyncio.Lock()
 
 
 def _require_hf_token() -> str:
-    token = os.getenv("HF_TOKEN")
+    token = settings.hf_token
     if not token:
         raise RuntimeError(
             "Missing HF_TOKEN environment variable. Set HF_TOKEN to your Hugging Face token."
@@ -157,9 +158,9 @@ def _generate_aws_bedrock_image_sync(model_id: str, prompt: str) -> Tuple[str, s
         )
 
     region_name = (
-        os.getenv("AWS_REGION_BEDROCK_NOVA_CANVAS", "us-east-1")
+        settings.aws_region_bedrock_nova_canvas
         if model_id == _NOVA_CANVAS_MODEL
-        else os.getenv("AWS_REGION_BEDROCK_IMAGE", "us-west-2")
+        else settings.aws_region_bedrock_image
     )
 
     bedrock = bedrock_runtime_client(region_name=region_name)
@@ -200,7 +201,7 @@ def _generate_aws_bedrock_image_sync(model_id: str, prompt: str) -> Tuple[str, s
 def _generate_openai_image_sync(model_id: str, prompt: str) -> Tuple[str, str]:
     from openai import OpenAI
 
-    api_key = os.getenv("OPENAI_KEY")
+    api_key = settings.openai_key
     if not api_key:
         raise RuntimeError("Missing OPENAI_KEY in environment.")
 

@@ -6,10 +6,10 @@ Uses AWS_ACCESS_KEY, AWS_SECRET_KEY, AWS_REGION from the environment.
 from __future__ import annotations
 
 import asyncio
-import os
 from typing import Any, Dict, List
 
 from dotenv import load_dotenv
+from app.core.config import settings
 from app.services.aws_clients import translate_client
 
 load_dotenv()
@@ -19,7 +19,7 @@ _MAX_TEXT_BYTES = 10_000
 
 
 def _translate_client():
-    return translate_client(region_name=os.getenv("AWS_REGION", "us-east-1"))
+    return translate_client(region_name=settings.aws_region)
 
 
 def _list_languages_sync() -> List[Dict[str, str]]:

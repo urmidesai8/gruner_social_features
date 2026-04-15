@@ -5,6 +5,8 @@ from app.models.schemas import (
     ContentCopilotResponse,
     GenerateQuoteCardRequest,
     GenerateQuoteCardResponse,
+    HashtagGenerationRequest,
+    HashtagGenerationResponse,
     SummarizePostRequest,
     SummarizePostResponse,
     VoiceToPostCommentRequest,
@@ -17,6 +19,7 @@ from app.models.schemas import (
 from app.services.content_copilot import generate_copilot_text
 from app.services.quote_card_generation import generate_quote_card_base64
 from app.services.summarize_post import summarize_post_text
+from app.services.hashtag_generation import generate_hashtags
 from app.services.text_translation import list_translate_languages, translate_post_text
 from app.services.voice_to_post_comment import voice_to_post_comment
 
@@ -76,6 +79,33 @@ async def summarize_post(req: SummarizePostRequest) -> SummarizePostResponse:
         raise HTTPException(status_code=500, detail=str(e)) from e
 
     return SummarizePostResponse(original_text=text, result=result)
+
+
+@router.post("/hashtag-generation", response_model=HashtagGenerationResponse)
+async def hashtag_generation(req: HashtagGenerationRequest) -> HashtagGenerationResponse:
+    text_caption = (req.text_caption or "").strip()
+    if not text_caption:
+        raise HTTPException(status_code=400, detail="Missing text_caption.")
+
+    try:
+        out = await generate_hashtags(
+            text_caption=text_caption,
+            media_image=req.media_image,
+            media_video=req.media_video,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+    return HashtagGenerationResponse(
+        hashtags=out["hashtags"],  # type: ignore[arg-type]
+        combined_caption=out["combined_caption"],  # type: ignore[arg-type]
+        used_sources=out["used_sources"],  # type: ignore[arg-type]
+        text_caption=out["text_caption"],  # type: ignore[arg-type]
+        image_caption=out["image_caption"],  # type: ignore[arg-type]
+        video_caption=out["video_caption"],  # type: ignore[arg-type]
+    )
 
 
 @router.post("/voice-to-post-comment", response_model=VoiceToPostCommentResponse)

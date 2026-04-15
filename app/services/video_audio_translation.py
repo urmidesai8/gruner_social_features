@@ -13,6 +13,7 @@ from typing import List, Tuple
 
 import botocore.exceptions
 
+from app.core.config import settings
 from app.services.aws_clients import polly_client, s3_client, transcribe_client
 from app.services.text_translation import _list_languages_sync, _resolve_target_language_code, _translate_client
 
@@ -32,23 +33,16 @@ class _Segment:
     text: str
 
 
-def _require_env(name: str) -> str:
-    v = os.getenv(name)
-    if not v:
-        raise RuntimeError(f"Missing required environment variable: {name}")
-    return v
-
-
 def _s3_client():
-    return s3_client(region_name=os.getenv("AWS_REGION", "us-east-1"))
+    return s3_client(region_name=settings.aws_region)
 
 
 def _transcribe_client():
-    return transcribe_client(region_name=os.getenv("AWS_REGION", "us-east-1"))
+    return transcribe_client(region_name=settings.aws_region)
 
 
 def _polly_client():
-    return polly_client(region_name=os.getenv("AWS_REGION", "us-east-1"))
+    return polly_client(region_name=settings.aws_region)
 
 
 def _run(cmd: List[str]) -> None:
@@ -103,7 +97,9 @@ def _translate_text_sync_auto(text: str, target_language_code: str) -> str:
 
 
 def _transcribe_audio_s3(audio_wav_path: str) -> List[_Segment]:
-    bucket = _require_env("TRANSCRIBE_BUCKET")
+    bucket = (settings.transcribe_bucket or "").strip()
+    if not bucket:
+        raise RuntimeError("Missing required environment variable: TRANSCRIBE_BUCKET")
     job_name = f"video-audio-translate-{uuid.uuid4().hex}"
     audio_key = f"video-audio-translate/{job_name}/audio.wav"
     out_key = f"video-audio-translate/{job_name}/transcript.json"
@@ -115,22 +111,28 @@ def _transcribe_audio_s3(audio_wav_path: str) -> List[_Segment]:
 
     transcribe = _transcribe_client()
     try:
-        transcribe.start_transcription_job(
-            TranscriptionJobName=job_name,
-            LanguageCode=os.getenv("TRANSCRIBE_LANGUAGE_CODE", "en-US"),
-            Media={"MediaFileUri": media_uri},
-            OutputBucketName=bucket,
-            OutputKey=out_key,
-            Settings={
+        transcribe_kwargs = {
+            "TranscriptionJobName": job_name,
+            "Media": {"MediaFileUri": media_uri},
+            "OutputBucketName": bucket,
+            "OutputKey": out_key,
+            "Settings": {
                 "ShowSpeakerLabels": False,
                 "ShowAlternatives": False,
             },
-        )
+        }
+        configured_lang = (settings.transcribe_language_code or "").strip()
+        if configured_lang:
+            transcribe_kwargs["LanguageCode"] = configured_lang
+        else:
+            # Default behavior: auto-detect source language.
+            transcribe_kwargs["IdentifyLanguage"] = True
+        transcribe.start_transcription_job(**transcribe_kwargs)
     except botocore.exceptions.ClientError as e:
         msg = e.response.get("Error", {}).get("Message", str(e))
         raise RuntimeError(f"AWS Transcribe error: {msg}") from e
 
-    deadline = time.time() + float(os.getenv("TRANSCRIBE_TIMEOUT_SECONDS", "300"))
+    deadline = time.time() + float(settings.transcribe_timeout_seconds)
     while True:
         if time.time() > deadline:
             raise RuntimeError("AWS Transcribe timed out waiting for transcription job completion.")
@@ -203,7 +205,7 @@ def _transcribe_audio_s3(audio_wav_path: str) -> List[_Segment]:
 
 
 def _pick_polly_voice(target_language_code: str) -> str:
-    explicit = (os.getenv("POLLY_VOICE_ID") or "").strip()
+    explicit = (settings.polly_voice_id or "").strip()
     if explicit:
         return explicit
     code = (target_language_code or "").strip().lower()
@@ -218,7 +220,7 @@ def _pick_polly_voice(target_language_code: str) -> str:
 def _polly_synthesize_segment_mp3(text: str, out_path: str, target_language_code: str) -> None:
     polly = _polly_client()
     voice = _pick_polly_voice(target_language_code)
-    engine = os.getenv("POLLY_ENGINE", "neural")
+    engine = settings.polly_engine
     try:
         resp = polly.synthesize_speech(
             Text=text,
@@ -279,7 +281,7 @@ def _mix_segments_to_track(
         filters.append(f"[{i}:a]adelay={ms}|{ms},aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo[s{i}]")
         labels.append(f"[s{i}]")
     amix_inputs = len(labels)
-    gain = os.getenv("POLLY_TRACK_VOLUME_GAIN", "2.4").strip() or "2.4"
+    gain = (settings.polly_track_volume_gain or "").strip() or "2.4"
     filters.append(
         "".join(labels)
         + f"amix=inputs={amix_inputs}:duration=longest:dropout_transition=0,volume={gain}[m]"

@@ -3,12 +3,12 @@ from typing import Optional, Tuple
 import asyncio
 import base64
 import io
-import os
 
 import torch
 from diffusers import DiffusionPipeline
 from dotenv import load_dotenv
 from PIL import Image
+from app.core.config import settings
 
 load_dotenv()
 
@@ -33,7 +33,7 @@ def _compose_enhance_prompt(user_prompt: Optional[str]) -> str:
 
 
 def _require_hf_token() -> str:
-    token = os.getenv("HF_TOKEN")
+    token = settings.hf_token
     if not token:
         raise RuntimeError(
             "Missing HF_TOKEN environment variable. Set HF_TOKEN to your Hugging Face token."

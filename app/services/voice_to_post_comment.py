@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import asyncio
 import json
-import os
 import time
 import uuid
 from typing import Literal
 
 import botocore.exceptions
 
+from app.core.config import settings
 from app.services.aws_clients import bedrock_runtime_client, s3_client, transcribe_client
 
 
@@ -16,15 +16,15 @@ _OutputKind = Literal["post", "comment"]
 
 
 def _s3_client():
-    return s3_client(region_name=os.getenv("AWS_REGION", "us-east-1"))
+    return s3_client(region_name=settings.aws_region)
 
 
 def _transcribe_client():
-    return transcribe_client(region_name=os.getenv("AWS_REGION", "us-east-1"))
+    return transcribe_client(region_name=settings.aws_region)
 
 
 def _bedrock_client():
-    return bedrock_runtime_client(region_name=os.getenv("AWS_REGION", "us-east-1"))
+    return bedrock_runtime_client(region_name=settings.aws_region)
 
 
 def _normalize_audio_base64(audio_base64: str) -> bytes:
@@ -70,7 +70,7 @@ def _upload_audio_and_transcribe_sync(
     mime_type: str,
     language_code: str | None,
 ) -> str:
-    bucket = (os.getenv("TRANSCRIBE_BUCKET") or "").strip()
+    bucket = (settings.transcribe_bucket or "").strip()
     if not bucket:
         raise RuntimeError("Missing TRANSCRIBE_BUCKET environment variable.")
 
@@ -109,7 +109,7 @@ def _upload_audio_and_transcribe_sync(
         msg = e.response.get("Error", {}).get("Message", str(e))
         raise RuntimeError(f"AWS Transcribe error: {msg}") from e
 
-    timeout_seconds = float(os.getenv("TRANSCRIBE_TIMEOUT_SECONDS", "300"))
+    timeout_seconds = float(settings.transcribe_timeout_seconds)
     deadline = time.time() + timeout_seconds
     while True:
         if time.time() > deadline:
@@ -140,7 +140,7 @@ def _upload_audio_and_transcribe_sync(
 
 
 def _cleanup_with_claude_sync(raw_transcript: str, output_kind: _OutputKind) -> str:
-    model_id = (os.getenv("BEDROCK_CLAUDE_SONNET_ID") or "").strip()
+    model_id = (settings.bedrock_claude_sonnet_id or "").strip()
     if not model_id:
         raise RuntimeError("Missing BEDROCK_CLAUDE_SONNET_ID in environment.")
 

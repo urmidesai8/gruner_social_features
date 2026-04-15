@@ -1,8 +1,8 @@
 import json
 import logging
-import os
 import time
 
+from app.core.config import settings
 from app.services.aws_clients import bedrock_runtime_client
 
 
@@ -15,11 +15,11 @@ async def summarize_post_text(text: str) -> str:
     """
     import botocore.exceptions
 
-    model_id = os.getenv("BEDROCK_CLAUDE_HAIKU_ID")
+    model_id = settings.bedrock_claude_haiku_id
     if not model_id:
         raise RuntimeError("Missing BEDROCK_CLAUDE_HAIKU_ID in environment.")
 
-    bedrock = bedrock_runtime_client(region_name=os.getenv("AWS_REGION"))
+    bedrock = bedrock_runtime_client(region_name=settings.aws_region)
 
     system_prompt = (
         "You help busy readers understand long social posts and articles. "

@@ -1,5 +1,6 @@
 fastapi
 uvicorn[standard]
+pydantic-settings
 
 huggingface-hub
 diffusers

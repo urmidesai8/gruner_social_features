@@ -1,14 +1,14 @@
 from __future__ import annotations
 
-import os
-
 import boto3
+
+from app.core.config import settings
 
 
 def aws_creds() -> tuple[str, str, str]:
-    access_key = os.getenv("AWS_ACCESS_KEY")
-    secret_key = os.getenv("AWS_SECRET_KEY")
-    region = os.getenv("AWS_REGION", "us-east-1")
+    access_key = settings.aws_access_key
+    secret_key = settings.aws_secret_key
+    region = settings.aws_region or settings.aws_default_region or "ap-south-1"
     if not (access_key and secret_key):
         raise RuntimeError(
             "Missing AWS credentials in environment (AWS_ACCESS_KEY/AWS_SECRET_KEY)."

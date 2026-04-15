@@ -12,6 +12,7 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
+from app.core.config import settings
 from app.services.aws_clients import bedrock_runtime_client
 from app.services.image_generation import generate_image_base64
 
@@ -30,7 +31,7 @@ _APP_DIR = Path(__file__).resolve().parent
 
 
 def _quote_font_candidates() -> List[str]:
-    env = (os.getenv("QUOTE_CARD_FONT_PATH") or "").strip()
+    env = (settings.quote_card_font_path or "").strip()
     paths = [
         env,
         "Poppins-Bold.ttf",
@@ -134,7 +135,7 @@ def _overlay_quote_on_image_sync(image_b64: str, quote: str) -> Tuple[str, str]:
 def _generate_quote_text_sync(user_prompt: str) -> str:
     import botocore.exceptions
 
-    model_id = os.getenv("BEDROCK_CLAUDE_HAIKU_ID")
+    model_id = settings.bedrock_claude_haiku_id
     if not model_id:
         raise RuntimeError("Missing BEDROCK_CLAUDE_HAIKU_ID in environment.")
 
@@ -145,7 +146,7 @@ def _generate_quote_text_sync(user_prompt: str) -> str:
         len(user_prompt or ""),
     )
 
-    bedrock = bedrock_runtime_client(region_name=os.getenv("AWS_REGION"))
+    bedrock = bedrock_runtime_client(region_name=settings.aws_region)
 
     system_prompt = (
         "You write short inspirational quotes for visual quote cards. "

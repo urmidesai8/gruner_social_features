@@ -2,10 +2,10 @@ from typing import Tuple
 
 import asyncio
 import base64
-import os
 
 from dotenv import load_dotenv
 from huggingface_hub import InferenceClient
+from app.core.config import settings
 from app.services.aws_clients import bedrock_runtime_client, s3_client
 
 load_dotenv()
@@ -23,10 +23,10 @@ def _generate_nova_reel_video_sync(prompt: str) -> Tuple[str, str]:
 
     import botocore.exceptions
 
-    AWS_REGION = os.getenv("AWS_REGION_BEDROCK_NOVA_REEL", "us-east-1")
+    AWS_REGION = settings.aws_region_bedrock_nova_reel
     SLEEP_SECONDS = 30
 
-    bucket_uri = os.getenv("NOVA_REEL_BUCKET")
+    bucket_uri = settings.nova_reel_bucket
     if not bucket_uri:
         raise RuntimeError("Missing NOVA_REEL_BUCKET environment variable for Nova Reel output.")
     if not bucket_uri.startswith("s3://"):
@@ -76,7 +76,7 @@ def _generate_nova_reel_video_sync(prompt: str) -> Tuple[str, str]:
 
     video_key = f"{key_prefix}/output.mp4"
 
-    s3 = s3_client(region_name=os.getenv("AWS_REGION_NOVA_REEL_S3", AWS_REGION))
+    s3 = s3_client(region_name=settings.aws_region_nova_reel_s3 or AWS_REGION)
     try:
         obj = s3.get_object(Bucket=bucket_name, Key=video_key)
     except botocore.exceptions.ClientError as e:
@@ -97,7 +97,7 @@ async def generate_video_base64(model: str, prompt: str) -> Tuple[str, str]:
         return await asyncio.to_thread(_generate_nova_reel_video_sync, prompt)
 
     client = InferenceClient(
-        api_key=os.getenv("HF_TOKEN"),
+        api_key=settings.hf_token,
     )
 
     video_bytes = client.text_to_video(

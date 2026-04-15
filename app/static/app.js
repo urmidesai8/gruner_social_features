@@ -68,6 +68,7 @@ function setStatus(text, type="image") {
     caption: "captionStatus",
     translate: "translateStatus",
     voicePost: "voicePostStatus",
+    hashtag: "hashtagStatus",
   };
   const el = document.getElementById(idByType[type] || "status");
   if (el) el.textContent = text;
@@ -723,6 +724,80 @@ async function toggleLiveVoiceRecording() {
   }
 }
 
+function setHashtagOutputs(data) {
+  const hashtagsEl = document.getElementById("hashtagHashtagsOutput");
+  const combinedEl = document.getElementById("hashtagCombinedCaptionOutput");
+  const usedSourcesEl = document.getElementById("hashtagUsedSourcesOutput");
+  const textCaptionEl = document.getElementById("hashtagTextCaptionOutput");
+  const imageCaptionEl = document.getElementById("hashtagImageCaptionOutput");
+  const videoCaptionEl = document.getElementById("hashtagVideoCaptionOutput");
+
+  const clearAll = () => {
+    if (hashtagsEl) hashtagsEl.value = "";
+    if (combinedEl) combinedEl.value = "";
+    if (usedSourcesEl) usedSourcesEl.value = "";
+    if (textCaptionEl) textCaptionEl.value = "";
+    if (imageCaptionEl) imageCaptionEl.value = "";
+    if (videoCaptionEl) videoCaptionEl.value = "";
+  };
+
+  if (!data) {
+    clearAll();
+    return;
+  }
+
+  if (hashtagsEl) hashtagsEl.value = Array.isArray(data.hashtags) ? data.hashtags.join(" ") : "";
+  if (combinedEl) combinedEl.value = data.combined_caption ? String(data.combined_caption) : "";
+  if (usedSourcesEl) {
+    usedSourcesEl.value = Array.isArray(data.used_sources) ? data.used_sources.join(", ") : "";
+  }
+  if (textCaptionEl) textCaptionEl.value = data.text_caption ? String(data.text_caption) : "";
+  if (imageCaptionEl) imageCaptionEl.value = data.image_caption ? String(data.image_caption) : "";
+  if (videoCaptionEl) videoCaptionEl.value = data.video_caption ? String(data.video_caption) : "";
+}
+
+async function generateHashtags() {
+  const textCaptionInput = document.getElementById("hashtagTextCaption");
+  const imageInput = document.getElementById("hashtagImageInput");
+  const videoInput = document.getElementById("hashtagVideoInput");
+
+  const text_caption = textCaptionInput && textCaptionInput.value ? textCaptionInput.value.trim() : "";
+  if (!text_caption) {
+    setStatus("text_caption is required.", "hashtag");
+    return;
+  }
+
+  const imageFile = imageInput && imageInput.files ? imageInput.files[0] : null;
+  const videoFile = videoInput && videoInput.files ? videoInput.files[0] : null;
+
+  const payload = { text_caption };
+  if (imageFile) {
+    payload.media_image = await readFileAsDataUrl(imageFile);
+  }
+  if (videoFile) {
+    payload.media_video = await readFileAsDataUrl(videoFile);
+  }
+
+  setStatus("Generating hashtags...", "hashtag");
+  setHashtagOutputs(null);
+
+  const res = await fetch("/api/hashtag-generation", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const detail = data && data.detail ? data.detail : res.statusText;
+    setStatus(`Error: ${detail}`, "hashtag");
+    return;
+  }
+
+  setHashtagOutputs(data);
+  setStatus("Done.", "hashtag");
+}
+
 async function generate() {
   const model = document.getElementById("model").value;
   const prompt = document.getElementById("prompt").value.trim();
@@ -964,6 +1039,29 @@ async function main() {
       toggleLiveVoiceRecording().catch((err) =>
         setStatus(`Error: ${err.message || err}`, "voicePost")
       );
+    });
+  }
+
+  const generateHashtagBtn = document.getElementById("generateHashtagBtn");
+  if (generateHashtagBtn) {
+    generateHashtagBtn.addEventListener("click", () => {
+      generateHashtags().catch((err) =>
+        setStatus(`Error: ${err.message || err}`, "hashtag")
+      );
+    });
+  }
+
+  const clearHashtagBtn = document.getElementById("clearHashtagBtn");
+  if (clearHashtagBtn) {
+    clearHashtagBtn.addEventListener("click", () => {
+      const textCaptionInput = document.getElementById("hashtagTextCaption");
+      const imageInput = document.getElementById("hashtagImageInput");
+      const videoInput = document.getElementById("hashtagVideoInput");
+      if (textCaptionInput) textCaptionInput.value = "";
+      if (imageInput) imageInput.value = "";
+      if (videoInput) videoInput.value = "";
+      setHashtagOutputs(null);
+      setStatus("", "hashtag");
     });
   }
 }
