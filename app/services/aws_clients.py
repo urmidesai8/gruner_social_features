@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import boto3
+import json
 
 from app.core.config import settings
 
@@ -61,4 +62,63 @@ def bedrock_invoke_model(client, **kwargs):
             kwargs["trace"] = guardrail_trace
 
     return client.invoke_model(**kwargs)
+
+
+def bedrock_guardrail_precheck_text(text: str, context_label: str = "input") -> None:
+    """
+    Run a lightweight Bedrock Guardrail gate over text before downstream services.
+    Raises ValueError when content is blocked by Guardrails.
+    """
+    content = (text or "").strip()
+    if not content:
+        return
+
+    guardrail_id = (settings.bedrock_guardrail_id or "").strip()
+    if not guardrail_id:
+        return
+
+    model_id = (
+        (settings.bedrock_claude_haiku_id or "").strip()
+        or (settings.bedrock_claude_sonnet_id or "").strip()
+    )
+    if not model_id:
+        raise RuntimeError(
+            "Guardrail precheck requested but no Bedrock text model is configured "
+            "(BEDROCK_CLAUDE_HAIKU_ID or BEDROCK_CLAUDE_SONNET_ID)."
+        )
+
+    bedrock = bedrock_runtime_client(region_name=settings.aws_region)
+    body = {
+        "anthropic_version": "bedrock-2023-05-31",
+        "max_tokens": 16,
+        "temperature": 0.0,
+        "system": (
+            "You are a safety gate checker. "
+            "If the user input is allowed, respond with exactly: ALLOW. "
+            "Do not include any extra words."
+        ),
+        "messages": [{"role": "user", "content": [{"type": "text", "text": content}]}],
+    }
+
+    try:
+        response = bedrock_invoke_model(
+            bedrock,
+            modelId=model_id,
+            body=json.dumps(body),
+            accept="application/json",
+            contentType="application/json",
+        )
+    except Exception as e:  # noqa: BLE001
+        raise RuntimeError(f"Guardrail precheck failed for {context_label}: {e}") from e
+
+    try:
+        payload = json.loads(response["body"].read())
+    except Exception as e:  # noqa: BLE001
+        raise RuntimeError(f"Guardrail precheck returned invalid payload for {context_label}.") from e
+    parts = payload.get("content", [])
+    text_out = "\n".join(
+        part.get("text", "").strip() for part in parts if isinstance(part, dict)
+    ).strip()
+    if text_out.upper() != "ALLOW":
+        raise ValueError(f"{context_label} was blocked by safety guardrails.")
 

@@ -10,6 +10,7 @@ import botocore.exceptions
 
 from app.core.config import settings
 from app.services.aws_clients import (
+    bedrock_guardrail_precheck_text,
     bedrock_invoke_model,
     bedrock_runtime_client,
     s3_client,
@@ -74,6 +75,7 @@ def _upload_audio_and_transcribe_sync(
     audio_bytes: bytes,
     mime_type: str,
     language_code: str | None,
+    precheck_text: str | None = None,
 ) -> str:
     bucket = (settings.transcribe_bucket or "").strip()
     if not bucket:
@@ -94,6 +96,10 @@ def _upload_audio_and_transcribe_sync(
         raise RuntimeError(f"Failed to upload audio to S3: {msg}") from e
 
     media_uri = f"s3://{bucket}/{audio_key}"
+    bedrock_guardrail_precheck_text(
+        (precheck_text or "").strip(),
+        context_label="voice transcribe request context",
+    )
     try:
         start_kwargs = {
             "TranscriptionJobName": job_name,
@@ -224,7 +230,12 @@ def _voice_to_post_comment_sync(
     normalized_lang = (language_code or "").strip()
 
     audio_bytes = _normalize_audio_base64(audio_base64)
-    raw_transcript = _upload_audio_and_transcribe_sync(audio_bytes, mime_type, normalized_lang)
+    raw_transcript = _upload_audio_and_transcribe_sync(
+        audio_bytes,
+        mime_type,
+        normalized_lang,
+        precheck_text=f"Voice input request. output_kind={normalized_kind}",
+    )
     final_text = _cleanup_with_claude_sync(raw_transcript, normalized_kind)  # type: ignore[arg-type]
     return {
         "raw_transcript": raw_transcript,

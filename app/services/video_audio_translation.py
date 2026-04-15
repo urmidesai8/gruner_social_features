@@ -14,7 +14,12 @@ from typing import List, Tuple
 import botocore.exceptions
 
 from app.core.config import settings
-from app.services.aws_clients import polly_client, s3_client, transcribe_client
+from app.services.aws_clients import (
+    bedrock_guardrail_precheck_text,
+    polly_client,
+    s3_client,
+    transcribe_client,
+)
 from app.services.text_translation import _list_languages_sync, _resolve_target_language_code, _translate_client
 
 _INDIAN_LANGUAGE_CODES = {"as", "bn", "gu", "hi", "kn", "ml", "mr", "or", "pa", "ta", "te"}
@@ -88,6 +93,7 @@ def _resolve_target_code(target_language: str) -> str:
 
 
 def _translate_text_sync_auto(text: str, target_language_code: str) -> str:
+    bedrock_guardrail_precheck_text(text, context_label="video translate source text")
     client = _translate_client()
     resp = client.translate_text(Text=text, SourceLanguageCode="auto", TargetLanguageCode=target_language_code)
     out = (resp.get("TranslatedText") or "").strip()
@@ -96,7 +102,7 @@ def _translate_text_sync_auto(text: str, target_language_code: str) -> str:
     return out
 
 
-def _transcribe_audio_s3(audio_wav_path: str) -> List[_Segment]:
+def _transcribe_audio_s3(audio_wav_path: str, precheck_text: str | None = None) -> List[_Segment]:
     bucket = (settings.transcribe_bucket or "").strip()
     if not bucket:
         raise RuntimeError("Missing required environment variable: TRANSCRIBE_BUCKET")
@@ -108,6 +114,10 @@ def _transcribe_audio_s3(audio_wav_path: str) -> List[_Segment]:
     s3.upload_file(audio_wav_path, bucket, audio_key)
 
     media_uri = f"s3://{bucket}/{audio_key}"
+    bedrock_guardrail_precheck_text(
+        (precheck_text or "").strip(),
+        context_label="video transcribe request context",
+    )
 
     transcribe = _transcribe_client()
     try:
@@ -331,7 +341,10 @@ def _translate_video_audio_sync(
         _ffmpeg("-i", src_path, "-vn", "-acodec", "pcm_s16le", "-ar", "16000", "-ac", "1", audio_wav)
 
         # ASR + timestamps.
-        segments = _transcribe_audio_s3(audio_wav)
+        segments = _transcribe_audio_s3(
+            audio_wav,
+            precheck_text=f"Video audio translation request. target_language={target_language}",
+        )
         target_language_code = _resolve_target_code(target_language)
 
         # Translate + TTS per segment, then delay/mix according to timestamps.

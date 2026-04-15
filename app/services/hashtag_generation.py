@@ -13,6 +13,7 @@ import botocore.exceptions
 
 from app.core.config import settings
 from app.services.aws_clients import (
+    bedrock_guardrail_precheck_text,
     bedrock_invoke_model,
     bedrock_runtime_client,
     s3_client,
@@ -88,7 +89,10 @@ def _extract_audio_wav_sync(video_bytes: bytes) -> str:
             return base64.b64encode(f.read()).decode("ascii")
 
 
-def _upload_audio_and_transcribe_sync(audio_bytes: bytes) -> str:
+def _upload_audio_and_transcribe_sync(
+    audio_bytes: bytes,
+    precheck_text: str | None = None,
+) -> str:
     bucket = (settings.transcribe_bucket or "").strip()
     if not bucket:
         raise RuntimeError("Missing TRANSCRIBE_BUCKET environment variable.")
@@ -105,6 +109,11 @@ def _upload_audio_and_transcribe_sync(audio_bytes: bytes) -> str:
     except botocore.exceptions.ClientError as e:
         msg = e.response.get("Error", {}).get("Message", str(e))
         raise RuntimeError(f"Failed to upload audio to S3: {msg}") from e
+
+    bedrock_guardrail_precheck_text(
+        (precheck_text or "").strip(),
+        context_label="hashtag transcribe request context",
+    )
 
     try:
         start_kwargs = {
@@ -200,6 +209,21 @@ def _hashtags_with_sonnet_sync(combined_caption: str) -> list[str]:
     try:
         parsed = json.loads(raw_text)
     except json.JSONDecodeError:
+        lower_raw = raw_text.lower()
+        guardrail_markers = (
+            "guardrail",
+            "safety",
+            "policy",
+            "cannot help",
+            "can't help",
+            "cannot assist",
+            "can't assist",
+            "not able to comply",
+            "not able to provide",
+            "blocked",
+        )
+        if any(marker in lower_raw for marker in guardrail_markers):
+            raise ValueError("Content was blocked by safety guardrails.")
         start = raw_text.find("{")
         end = raw_text.rfind("}")
         if start == -1 or end == -1 or end <= start:
@@ -239,6 +263,7 @@ async def generate_hashtags(
     text = (text_caption or "").strip()
     if not text:
         raise ValueError("Missing text_caption.")
+    bedrock_guardrail_precheck_text(text, context_label="hashtag generation")
 
     captions: list[str] = [text]
     used_sources: list[str] = ["text_caption"]
@@ -255,7 +280,11 @@ async def generate_hashtags(
         video_bytes = _normalize_base64_payload(media_video or "", "media_video")
         audio_wav_base64 = await asyncio.to_thread(_extract_audio_wav_sync, video_bytes)
         audio_bytes = base64.b64decode(audio_wav_base64)
-        video_caption = await asyncio.to_thread(_upload_audio_and_transcribe_sync, audio_bytes)
+        video_caption = await asyncio.to_thread(
+            _upload_audio_and_transcribe_sync,
+            audio_bytes,
+            f"Hashtag generation request context. text_caption={text}",
+        )
         if video_caption:
             captions.append(video_caption)
             used_sources.append("media_video")
@@ -263,6 +292,10 @@ async def generate_hashtags(
     combined_caption = "\n".join(f"- {part}" for part in captions if (part or "").strip()).strip()
     if not combined_caption:
         raise RuntimeError("No caption content available for hashtag generation.")
+    bedrock_guardrail_precheck_text(
+        combined_caption,
+        context_label="hashtag combined caption",
+    )
 
     hashtags = await asyncio.to_thread(_hashtags_with_sonnet_sync, combined_caption)
     return {

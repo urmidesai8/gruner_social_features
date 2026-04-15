@@ -10,7 +10,7 @@ from typing import Any, Dict, List
 
 from dotenv import load_dotenv
 from app.core.config import settings
-from app.services.aws_clients import translate_client
+from app.services.aws_clients import bedrock_guardrail_precheck_text, translate_client
 
 load_dotenv()
 
@@ -102,6 +102,7 @@ def _translate_text_sync(
     import botocore.exceptions
 
     src = (source_language_code or "auto").strip().lower()
+    bedrock_guardrail_precheck_text(text, context_label="translation input text")
     languages = _list_languages_sync()
     tgt = _resolve_target_language_code(target_language, languages)
     tgt_lower = tgt.lower()
