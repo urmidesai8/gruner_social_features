@@ -624,11 +624,11 @@
         <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 1.5rem 0;" />
 
         <div class="input-group">
-          <label for="hashtagTextCaption">Hashtag Generation - Text Caption (required)</label>
+          <label for="hashtagTextCaption">Hashtag Generation - Text Caption (optional)</label>
           <textarea
             id="hashtagTextCaption"
             rows="4"
-            placeholder="Write your post caption (required)."
+            placeholder="Write your post caption (optional). You can also upload image/video only."
           ></textarea>
         </div>
 
@@ -719,7 +719,7 @@
 
     <!-- Ensure existing JS can find these IDs for the image generation specifically -->
     <!-- Cache-bust to ensure latest app.js is loaded in browser -->
-    <script src="/static/app.js?v=17"></script>
+    <script src="/static/app.js?v=18"></script>
     <script>
       // DOM Elements
       const tabImageBtn = document.getElementById('tabImage');

@@ -84,14 +84,19 @@ async def summarize_post(req: SummarizePostRequest) -> SummarizePostResponse:
 @router.post("/hashtag-generation", response_model=HashtagGenerationResponse)
 async def hashtag_generation(req: HashtagGenerationRequest) -> HashtagGenerationResponse:
     text_caption = (req.text_caption or "").strip()
-    if not text_caption:
-        raise HTTPException(status_code=400, detail="Missing text_caption.")
+    media_image = (req.media_image or "").strip()
+    media_video = (req.media_video or "").strip()
+    if not (text_caption or media_image or media_video):
+        raise HTTPException(
+            status_code=400,
+            detail="Missing input. Provide at least one of text_caption, media_image, or media_video.",
+        )
 
     try:
         out = await generate_hashtags(
-            text_caption=text_caption,
-            media_image=req.media_image,
-            media_video=req.media_video,
+            text_caption=text_caption or None,
+            media_image=media_image or None,
+            media_video=media_video or None,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e

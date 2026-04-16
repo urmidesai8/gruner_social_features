@@ -762,13 +762,12 @@ async function generateHashtags() {
   const videoInput = document.getElementById("hashtagVideoInput");
 
   const text_caption = textCaptionInput && textCaptionInput.value ? textCaptionInput.value.trim() : "";
-  if (!text_caption) {
-    setStatus("text_caption is required.", "hashtag");
-    return;
-  }
-
   const imageFile = imageInput && imageInput.files ? imageInput.files[0] : null;
   const videoFile = videoInput && videoInput.files ? videoInput.files[0] : null;
+  if (!text_caption && !imageFile && !videoFile) {
+    setStatus("Provide at least one of text caption, image, or video.", "hashtag");
+    return;
+  }
 
   const payload = { text_caption };
   if (imageFile) {

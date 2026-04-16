@@ -297,7 +297,60 @@ Notes:
 
 ---
 
-### 2) Content Co-Pilot
+### 2) Hashtag Generation
+**Endpoint:** `POST /api/hashtag-generation`
+
+Pipelines:
+- Uses any combination of `text_caption`, `media_image`, and `media_video` (at least one is required).
+- If `media_image` is provided, generates an image caption (BLIP) and combines it with `text_caption`.
+- If `media_video` is provided, extracts audio and transcribes via AWS Transcribe; transcript is combined with other captions.
+- Final combined caption is sent to Bedrock Claude Sonnet to generate hashtags.
+
+**Request Body**
+```json
+{
+  "text_caption": "Sunset walk and clearing my head after a long week.",
+  "media_image": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA...",
+  "media_video": "data:video/mp4;base64,AAAAIGZ0eXBpc29tAAACAGlzb20..."
+}
+```
+
+You may also call it with image/video only:
+```json
+{
+  "media_image": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA..."
+}
+```
+
+**Response Body**
+```json
+{
+  "hashtags": [
+    "#sunset",
+    "#eveningwalk",
+    "#weekendvibes"
+  ],
+  "combined_caption": "- Sunset walk and clearing my head after a long week.\n- A person walking on a beach at sunset.\n- ...transcribed audio text...",
+  "used_sources": [
+    "text_caption",
+    "media_image",
+    "media_video"
+  ],
+  "text_caption": "Sunset walk and clearing my head after a long week.",
+  "image_caption": "A person walking on a beach at sunset.",
+  "video_caption": "...transcribed audio text..."
+}
+```
+
+Notes:
+- Provide at least one of `text_caption`, `media_image`, or `media_video`; otherwise returns `400` with:
+  - `detail: "Missing input. Provide at least one of text_caption, media_image, or media_video."`
+- `media_image` and `media_video` are optional. If you upload a video with no audio track, the service returns `400`.
+- `media_image` / `media_video` can be provided as a full Data URL (`data:<mime>;base64,...`) or raw base64 (backend strips Data URL prefix when present).
+
+---
+
+### 3) Content Co-Pilot
 **Endpoint:** `POST /api/content-copilot`
 
 Modes:
@@ -324,7 +377,7 @@ Modes:
 
 ---
 
-### 3) Summarize Post
+### 4) Summarize Post
 **Endpoint:** `POST /api/summarize-post`
 
 **Request Body**
@@ -347,7 +400,7 @@ Notes:
 
 ---
 
-### 4) List Translation Languages
+### 5) List Translation Languages
 **Endpoint:** `GET /api/translate-languages`
 
 **Response Body**
@@ -366,7 +419,7 @@ Notes:
 
 ---
 
-### 5) Translate Text
+### 6) Translate Text
 **Endpoint:** `POST /api/translate-text`
 
 **Request Body**
@@ -394,7 +447,7 @@ Field details:
 
 ---
 
-### 6) Voice to Post/Comment
+### 7) Voice to Post/Comment
 **Endpoint:** `POST /api/voice-to-post-comment`
 
 Pipeline:
