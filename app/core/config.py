@@ -33,6 +33,9 @@ class Settings(BaseSettings):
 
     quote_card_font_path: Optional[str] = None
     polly_voice_id: Optional[str] = None
+
+    # PostgreSQL audit log (e.g. DATABASE_URL=postgresql://user:pass@host:5432/dbname)
+    database_url: Optional[str] = None
     polly_engine: str = "neural"
     polly_track_volume_gain: str = ""
 
