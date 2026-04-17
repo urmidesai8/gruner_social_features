@@ -255,6 +255,37 @@ def _hashtags_with_sonnet_sync(combined_caption: str) -> list[str]:
     return cleaned
 
 
+_GUARDRAIL_BLOCKED_SUBSTR = "was blocked by safety guardrails"
+
+
+def _guardrail_blocked_result(message: str) -> dict[str, object]:
+    """Non-exception outcome when Bedrock guardrail precheck blocks content."""
+    return {
+        "hashtags": [],
+        "combined_caption": message,
+        "used_sources": [],
+        "text_caption": "",
+        "image_caption": None,
+        "video_caption": None,
+        "guardrail_blocked": True,
+    }
+
+
+def _precheck_text_or_blocked(content: str, context_label: str) -> dict[str, object] | None:
+    """
+    Run guardrail precheck. Returns a blocked payload dict if guardrails intervene,
+    otherwise None. Re-raises ValueError for non-guardrail validation errors.
+    """
+    try:
+        bedrock_guardrail_precheck_text(content, context_label=context_label)
+    except ValueError as e:
+        msg = str(e)
+        if _GUARDRAIL_BLOCKED_SUBSTR in msg:
+            return _guardrail_blocked_result(msg)
+        raise
+    return None
+
+
 async def generate_hashtags(
     text_caption: str | None = None,
     media_image: str | None = None,
@@ -271,7 +302,9 @@ async def generate_hashtags(
     captions: list[str] = []
     used_sources: list[str] = []
     if text:
-        bedrock_guardrail_precheck_text(text, context_label="hashtag text_caption")
+        blocked = _precheck_text_or_blocked(text, "hashtag text_caption")
+        if blocked is not None:
+            return blocked
         captions.append(text)
         used_sources.append("text_caption")
     image_caption = ""
@@ -284,14 +317,20 @@ async def generate_hashtags(
             used_sources.append("media_image")
 
     if has_video:
-        video_bytes = _normalize_base64_payload(media_video or "", "media_video")
-        audio_wav_base64 = await asyncio.to_thread(_extract_audio_wav_sync, video_bytes)
-        audio_bytes = base64.b64decode(audio_wav_base64)
-        video_caption = await asyncio.to_thread(
-            _upload_audio_and_transcribe_sync,
-            audio_bytes,
-            f"Hashtag generation request context. text_caption={text}",
-        )
+        try:
+            video_bytes = _normalize_base64_payload(media_video or "", "media_video")
+            audio_wav_base64 = await asyncio.to_thread(_extract_audio_wav_sync, video_bytes)
+            audio_bytes = base64.b64decode(audio_wav_base64)
+            video_caption = await asyncio.to_thread(
+                _upload_audio_and_transcribe_sync,
+                audio_bytes,
+                f"Hashtag generation request context. text_caption={text}",
+            )
+        except ValueError as e:
+            msg = str(e)
+            if _GUARDRAIL_BLOCKED_SUBSTR in msg:
+                return _guardrail_blocked_result(msg)
+            raise
         if video_caption:
             captions.append(video_caption)
             used_sources.append("media_video")
@@ -299,10 +338,9 @@ async def generate_hashtags(
     combined_caption = "\n".join(f"- {part}" for part in captions if (part or "").strip()).strip()
     if not combined_caption:
         raise RuntimeError("No caption content available for hashtag generation.")
-    bedrock_guardrail_precheck_text(
-        combined_caption,
-        context_label="hashtag combined caption",
-    )
+    blocked = _precheck_text_or_blocked(combined_caption, "hashtag combined caption")
+    if blocked is not None:
+        return blocked
 
     hashtags = await asyncio.to_thread(_hashtags_with_sonnet_sync, combined_caption)
     return {
@@ -310,8 +348,9 @@ async def generate_hashtags(
         "combined_caption": combined_caption,
         "used_sources": used_sources,
         "text_caption": text,
-        "image_caption": image_caption,
-        "video_caption": video_caption,
+        "image_caption": image_caption or None,
+        "video_caption": video_caption or None,
+        "guardrail_blocked": False,
     }
 
 

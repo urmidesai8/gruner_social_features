@@ -313,17 +313,19 @@ async def hashtag_generation(
             media_image=media_image or None,
             media_video=media_video or None,
         )
+        guardrail_blocked = bool(out.get("guardrail_blocked"))
         resp = HashtagGenerationResponse(
             hashtags=out["hashtags"],  # type: ignore[arg-type]
-            combined_caption=out["combined_caption"],  # type: ignore[arg-type]
+            combined_caption=str(out["combined_caption"]),
             used_sources=out["used_sources"],  # type: ignore[arg-type]
             text_caption=redact_text_if_guardrail_blocked(
-                out["text_caption"],  # type: ignore[arg-type]
+                str(out["text_caption"]),
                 context_label="hashtag text_caption echo",
                 run_guardrail_precheck=False,
+                blocked_by_guardrail=guardrail_blocked,
             ),
-            image_caption=out["image_caption"],  # type: ignore[arg-type]
-            video_caption=out["video_caption"],  # type: ignore[arg-type]
+            image_caption=out.get("image_caption"),  # type: ignore[arg-type]
+            video_caption=out.get("video_caption"),  # type: ignore[arg-type]
         )
         return resp
     except HTTPException as e:
