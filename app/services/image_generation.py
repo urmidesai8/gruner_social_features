@@ -12,7 +12,11 @@ from PIL import Image
 import torch
 from dotenv import load_dotenv
 from app.core.config import settings
-from app.services.aws_clients import bedrock_invoke_model, bedrock_runtime_client
+from app.services.aws_clients import (
+    bedrock_invoke_model,
+    bedrock_response_guardrail_intervened,
+    bedrock_runtime_client,
+)
 
 load_dotenv()
 
@@ -147,7 +151,7 @@ def _generate_kandinsky_sync(pipe: DiffusionPipeline, prompt: str) -> Image.Imag
     return pipe(prompt).images[0]
 
 
-def _generate_aws_bedrock_image_sync(model_id: str, prompt: str) -> Tuple[str, str]:
+def _generate_aws_bedrock_image_sync(model_id: str, prompt: str) -> Tuple[str, str, bool]:
     import botocore.exceptions
     import json
 
@@ -190,13 +194,17 @@ def _generate_aws_bedrock_image_sync(model_id: str, prompt: str) -> Tuple[str, s
         raise RuntimeError(f"AWS Bedrock error: {error_message}") from e
 
     response_body = json.loads(response.get("body").read())
+    guardrail_blocked = bedrock_response_guardrail_intervened(
+        response=response,
+        payload=response_body,
+    )
     if "images" not in response_body or response_body["images"] is None:
         raise RuntimeError(
             f"Bedrock ({model_id}) response did not contain 'images'. Raw response: {json.dumps(response_body)}"
         )
 
     base64_image = response_body.get("images")[0]
-    return "image/png", base64_image
+    return "image/png", base64_image, guardrail_blocked
 
 
 def _generate_openai_image_sync(model_id: str, prompt: str) -> Tuple[str, str]:
@@ -233,7 +241,7 @@ def _generate_openai_image_sync(model_id: str, prompt: str) -> Tuple[str, str]:
     return "image/png", base64_image
 
 
-async def generate_image_base64(model: str, prompt: str) -> Tuple[str, str]:
+async def generate_image_base64(model: str, prompt: str) -> Tuple[str, str, bool]:
     if model not in MODELS:
         raise ValueError(f"Unknown model: {model}")
 
@@ -241,7 +249,8 @@ async def generate_image_base64(model: str, prompt: str) -> Tuple[str, str]:
         async with _kandinsky_generate_lock:
             pipe = await _get_kandinsky_pipeline()
             image: Image.Image = await asyncio.to_thread(_generate_kandinsky_sync, pipe, prompt)
-            return _encode_pil_image_to_base64(image)
+            mime_type, image_base64 = _encode_pil_image_to_base64(image)
+            return mime_type, image_base64, False
 
     if model == _STABILITY_MODEL:
         client = _get_stability_inference_client_hf_inference()
@@ -249,16 +258,19 @@ async def generate_image_base64(model: str, prompt: str) -> Tuple[str, str]:
             image = await asyncio.to_thread(client.text_to_image, prompt, model=model)
         except HfHubHTTPError as e:
             raise RuntimeError(f"Model call failed for '{model}': {e}.") from e
-        return _encode_pil_image_to_base64(image)
+        mime_type, image_base64 = _encode_pil_image_to_base64(image)
+        return mime_type, image_base64, False
 
     if model in (_TITAN_MODEL, _NOVA_CANVAS_MODEL):
         return await asyncio.to_thread(_generate_aws_bedrock_image_sync, model, prompt)
 
     if model == _OPENAI_MODEL:
-        return await asyncio.to_thread(_generate_openai_image_sync, model, prompt)
+        mime_type, image_base64 = await asyncio.to_thread(_generate_openai_image_sync, model, prompt)
+        return mime_type, image_base64, False
 
     image = await asyncio.to_thread(_generate_via_inference_client, model, prompt)
-    return _encode_pil_image_to_base64(image)
+    mime_type, image_base64 = _encode_pil_image_to_base64(image)
+    return mime_type, image_base64, False
 
 
 __all__ = [

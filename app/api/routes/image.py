@@ -16,6 +16,7 @@ from app.services.image_enhancement import enhance_image_base64
 from app.services.image_generation import MODELS, generate_image_base64
 from app.services.image_captioning import generate_image_caption_options
 from app.api.deps import extract_prompt
+from app.services.aws_clients import redact_text_if_guardrail_blocked
 
 
 router = APIRouter(prefix="/api", tags=["Image Related Features"])
@@ -29,14 +30,19 @@ async def list_models() -> Dict[str, list[str]]:
 @router.post("/generate-image", response_model=GenerateImageResponse)
 async def generate_image(req: GenerateImageRequest) -> GenerateImageResponse:
     try:
-        mime_type, image_base64 = await generate_image_base64(req.model, req.prompt)
+        mime_type, image_base64, guardrail_blocked = await generate_image_base64(req.model, req.prompt)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except RuntimeError as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
     return GenerateImageResponse(
         model=req.model,
-        prompt=req.prompt,
+        prompt=redact_text_if_guardrail_blocked(
+            req.prompt,
+            context_label="image generation prompt echo",
+            run_guardrail_precheck=not req.model.startswith("amazon."),
+            blocked_by_guardrail=guardrail_blocked,
+        ),
         mime_type=mime_type,
         image_base64=image_base64,
     )
@@ -56,7 +62,11 @@ async def enhance_image(req: EnhanceImageRequest) -> EnhanceImageResponse:
         raise HTTPException(status_code=500, detail=str(e)) from e
     return EnhanceImageResponse(
         model="black-forest-labs/FLUX.2-klein-9b-kv",
-        prompt=prompt,
+        prompt=redact_text_if_guardrail_blocked(
+            prompt,
+            context_label="image enhancement prompt echo",
+            run_guardrail_precheck=True,
+        ),
         mime_type=mime_type,
         image_base64=image_base64,
     )
@@ -83,7 +93,7 @@ async def chat(req: ChatRequest) -> ChatResponse:
         raise HTTPException(status_code=400, detail="Missing prompt/messages.")
 
     try:
-        mime_type, image_base64 = await generate_image_base64(req.model, prompt)
+        mime_type, image_base64, _ = await generate_image_base64(req.model, prompt)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except RuntimeError as e:

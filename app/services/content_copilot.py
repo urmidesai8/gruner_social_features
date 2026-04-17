@@ -3,13 +3,17 @@ import logging
 import time
 
 from app.core.config import settings
-from app.services.aws_clients import bedrock_invoke_model, bedrock_runtime_client
+from app.services.aws_clients import (
+    bedrock_invoke_model,
+    bedrock_response_guardrail_intervened,
+    bedrock_runtime_client,
+)
 
 
 logger = logging.getLogger("uvicorn.error")
 
 
-async def generate_copilot_text(mode: str, text: str) -> str:
+async def generate_copilot_text(mode: str, text: str) -> tuple[str, bool]:
     """
     AI Content Co-Pilot using Claude Haiku.
 
@@ -76,6 +80,10 @@ async def generate_copilot_text(mode: str, text: str) -> str:
         raise RuntimeError(f"Bedrock Claude Haiku error: {error_message}") from e
 
     payload = json.loads(response["body"].read())
+    guardrail_blocked = bedrock_response_guardrail_intervened(
+        response=response,
+        payload=payload,
+    )
     content = payload.get("content", [])
     parts = [part.get("text", "") for part in content if isinstance(part, dict)]
     result = "\n".join(p.strip() for p in parts if p.strip()).strip()
@@ -107,7 +115,7 @@ async def generate_copilot_text(mode: str, text: str) -> str:
         int((time.perf_counter() - t0) * 1000),
         len(result),
     )
-    return result
+    return result, guardrail_blocked
 
 
 __all__ = [

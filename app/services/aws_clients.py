@@ -64,6 +64,34 @@ def bedrock_invoke_model(client, **kwargs):
     return client.invoke_model(**kwargs)
 
 
+def bedrock_response_guardrail_intervened(
+    response: dict,
+    payload: dict | None = None,
+) -> bool:
+    """
+    Detect whether Bedrock Guardrails intervened for an invoke_model response.
+    Checks both response headers and known payload fields.
+    """
+    headers = (
+        response.get("ResponseMetadata", {})
+        .get("HTTPHeaders", {})
+    )
+    for key, value in headers.items():
+        key_l = str(key).lower()
+        val_l = str(value).lower()
+        if "guardrail" in key_l and val_l in {"intervened", "blocked"}:
+            return True
+
+    body = payload or {}
+    action = (
+        body.get("amazon-bedrock-guardrailAction")
+        or body.get("guardrailAction")
+        or ""
+    )
+    action_l = str(action).lower()
+    return action_l in {"intervened", "blocked"}
+
+
 def bedrock_guardrail_precheck_text(text: str, context_label: str = "input") -> None:
     """
     Run a lightweight Bedrock Guardrail gate over text before downstream services.
@@ -121,4 +149,33 @@ def bedrock_guardrail_precheck_text(text: str, context_label: str = "input") -> 
     ).strip()
     if text_out.upper() != "ALLOW":
         raise ValueError(f"{context_label} was blocked by safety guardrails.")
+
+
+def redact_text_if_guardrail_blocked(
+    text: str,
+    context_label: str = "input",
+    redacted_value: str = "[REDACTED]",
+    run_guardrail_precheck: bool = False,
+    blocked_by_guardrail: bool | None = None,
+) -> str:
+    """
+    Return a guardrail-safe text for response echoes.
+    Redacts only when a block is known:
+    - blocked_by_guardrail=True, or
+    - run_guardrail_precheck=True and precheck blocks.
+    """
+    content = (text or "").strip()
+    if not content:
+        return content
+    if blocked_by_guardrail is True:
+        return redacted_value
+    if blocked_by_guardrail is False:
+        return content
+    if not run_guardrail_precheck:
+        return content
+    try:
+        bedrock_guardrail_precheck_text(content, context_label=context_label)
+    except ValueError:
+        return redacted_value
+    return content
 

@@ -10,6 +10,7 @@ from app.models.schemas import (
 )
 from app.services.video_audio_translation import translate_video_audio_base64
 from app.services.video_generation import VIDEO_MODELS, generate_video_base64
+from app.services.aws_clients import redact_text_if_guardrail_blocked
 
 
 router = APIRouter(prefix="/api", tags=["Video Related Features"])
@@ -30,7 +31,11 @@ async def generate_video(req: GenerateVideoRequest) -> GenerateVideoResponse:
         raise HTTPException(status_code=500, detail=str(e)) from e
     return GenerateVideoResponse(
         model=req.model,
-        prompt=req.prompt,
+        prompt=redact_text_if_guardrail_blocked(
+            req.prompt,
+            context_label="video generation prompt echo",
+            run_guardrail_precheck=False,
+        ),
         mime_type=mime_type,
         video_base64=video_base64,
     )

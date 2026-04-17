@@ -13,7 +13,11 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
 from app.core.config import settings
-from app.services.aws_clients import bedrock_invoke_model, bedrock_runtime_client
+from app.services.aws_clients import (
+    bedrock_invoke_model,
+    bedrock_response_guardrail_intervened,
+    bedrock_runtime_client,
+)
 from app.services.image_generation import generate_image_base64
 
 _QUOTE_CARD_MODEL = "stabilityai/stable-diffusion-xl-base-1.0"
@@ -132,7 +136,7 @@ def _overlay_quote_on_image_sync(image_b64: str, quote: str) -> Tuple[str, str]:
     return "image/png", final_b64
 
 
-def _generate_quote_text_sync(user_prompt: str) -> str:
+def _generate_quote_text_sync(user_prompt: str) -> tuple[str, bool]:
     import botocore.exceptions
 
     model_id = settings.bedrock_claude_haiku_id
@@ -179,6 +183,10 @@ def _generate_quote_text_sync(user_prompt: str) -> str:
         raise RuntimeError(f"Bedrock Claude Haiku error: {error_message}") from e
 
     payload = json.loads(response["body"].read())
+    guardrail_blocked = bedrock_response_guardrail_intervened(
+        response=response,
+        payload=payload,
+    )
     content = payload.get("content", [])
     text_parts = [part.get("text", "") for part in content if isinstance(part, dict)]
     quote = " ".join(part.strip() for part in text_parts if part.strip()).strip()
@@ -197,18 +205,18 @@ def _generate_quote_text_sync(user_prompt: str) -> str:
         int((time.perf_counter() - t0) * 1000),
         len(quote),
     )
-    return quote
+    return quote, guardrail_blocked
 
 
-async def generate_quote_card_base64(user_prompt: str) -> Tuple[str, str, str]:
+async def generate_quote_card_base64(user_prompt: str) -> Tuple[str, str, str, bool]:
     req_t0 = time.perf_counter()
     logger.info("quote-cards: start prompt_len=%d", len(user_prompt or ""))
 
-    quote_text = await asyncio.to_thread(_generate_quote_text_sync, user_prompt)
+    quote_text, guardrail_blocked = await asyncio.to_thread(_generate_quote_text_sync, user_prompt)
 
     bg_t0 = time.perf_counter()
     logger.info("quote-cards: step=flux_background start model=%s", _QUOTE_CARD_MODEL)
-    _, bg_base64 = await generate_image_base64(_QUOTE_CARD_MODEL, _QUOTE_BG_ONLY_PROMPT)
+    _, bg_base64, _ = await generate_image_base64(_QUOTE_CARD_MODEL, _QUOTE_BG_ONLY_PROMPT)
     logger.info(
         "quote-cards: step=flux_background done elapsed_ms=%d",
         int((time.perf_counter() - bg_t0) * 1000),
@@ -222,7 +230,7 @@ async def generate_quote_card_base64(user_prompt: str) -> Tuple[str, str, str]:
         "quote-cards: done elapsed_ms=%d",
         int((time.perf_counter() - req_t0) * 1000),
     )
-    return quote_text, mime_type, final_image_base64
+    return quote_text, mime_type, final_image_base64, guardrail_blocked
 
 
 __all__ = [
